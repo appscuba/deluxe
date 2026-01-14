@@ -1,0 +1,8 @@
+{
+  "name": "Deluxe Dental Care Scheduler",
+  "description": "A comprehensive dental clinic management and booking platform with client and administrator portals.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
