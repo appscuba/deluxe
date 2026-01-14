@@ -24,13 +24,15 @@ import {
   CalendarDays,
   FileText,
   ChevronRight,
+  ChevronLeft,
   Stethoscope,
   ClipboardList,
   ShieldCheck,
   UserPlus,
   Mail,
   Phone,
-  Lock
+  Lock,
+  RefreshCw
 } from 'lucide-react';
 import { AreaChart, Area, Tooltip, ResponsiveContainer, BarChart as RechartsBar, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 
@@ -51,31 +53,51 @@ export const AdminView: React.FC = () => {
 
   const [showSlotModal, setShowSlotModal] = useState(false);
   const [showAdminModal, setShowAdminModal] = useState(false);
-  const [slotDate, setSlotDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [slotStart, setSlotStart] = useState('09:00');
   const [slotEnd, setSlotEnd] = useState('09:45');
   const [searchTerm, setSearchTerm] = useState('');
   
+  const [newAdminData, setNewAdminData] = useState({ name: '', email: '', password: '' });
+
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [viewingPatientFile, setViewingPatientFile] = useState(false);
 
-  // Form para nuevo Admin
-  const [newAdminData, setNewAdminData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    password: ''
-  });
+  const [currentMonth, setCurrentMonth] = useState(new Date());
 
   const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
-
   const bookings = useMemo(() => appointments.filter(a => a.status !== 'available'), [appointments]);
+
+  const daysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
+  const firstDayOfMonth = (year: number, month: number) => new Date(year, month, 1).getDay();
+
+  const calendarDays = useMemo(() => {
+    const year = currentMonth.getFullYear();
+    const month = currentMonth.getMonth();
+    const daysCount = daysInMonth(year, month);
+    const startDay = firstDayOfMonth(year, month);
+    const days = [];
+    
+    for (let i = 0; i < startDay; i++) days.push(null);
+    for (let i = 1; i <= daysCount; i++) {
+      const d = new Date(year, month, i);
+      days.push(d.toISOString().split('T')[0]);
+    }
+    return days;
+  }, [currentMonth]);
+
+  const changeMonth = (offset: number) => {
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + offset, 1));
+  };
 
   const updateStatus = (id: string, newStatus: Appointment['status']) => {
     setAppointments(prev => prev.map(app => {
       if (app.id === id) {
         if (app.clientId) {
-          addNotification(app.clientId, `Actualización de Cita`, `Tu cita ha sido marcada como ${newStatus}.`, 'status_change');
+          const title = newStatus === 'approved' ? 'Cita Aprobada' : 
+                        newStatus === 'rejected' ? 'Cita Rechazada' : 
+                        newStatus === 'completed' ? 'Cita Completada' : 'Actualización de Cita';
+          addNotification(app.clientId, title, `Tu cita del ${app.date} ha sido marcada como ${newStatus}.`, 'status_change');
         }
         return { ...app, status: newStatus };
       }
@@ -85,10 +107,17 @@ export const AdminView: React.FC = () => {
 
   const createSlot = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!slotDate || !slotStart || !slotEnd) return;
+    if (!selectedDate || !slotStart || !slotEnd) return;
+    
+    const exists = appointments.some(a => a.date === selectedDate && a.startTime === slotStart);
+    if (exists) {
+      alert("Ya existe un turno programado a esta hora.");
+      return;
+    }
+
     const newSlot: Appointment = {
       id: Math.random().toString(36).substr(2, 9),
-      date: slotDate,
+      date: selectedDate,
       startTime: slotStart,
       endTime: slotEnd,
       status: 'available',
@@ -100,17 +129,17 @@ export const AdminView: React.FC = () => {
 
   const createAdmin = (e: React.FormEvent) => {
     e.preventDefault();
-    const newAdmin: User = {
+    const newUser: User = {
       id: Math.random().toString(36).substr(2, 9),
       name: newAdminData.name,
       email: newAdminData.email,
-      phone: newAdminData.phone,
+      phone: 'N/A',
       role: 'admin',
       createdAt: new Date().toISOString()
     };
-    setAllUsers(prev => [...prev, newAdmin]);
+    setAllUsers(prev => [...prev, newUser]);
+    setNewAdminData({ name: '', email: '', password: '' });
     setShowAdminModal(false);
-    setNewAdminData({ name: '', email: '', phone: '', password: '' });
   };
 
   const removeAppointment = (id: string) => {
@@ -118,8 +147,6 @@ export const AdminView: React.FC = () => {
       setAppointments(prev => prev.filter(a => a.id !== id));
     }
   };
-
-  // --- RENDERS DE MÓDULOS ---
 
   const renderDashboard = () => {
     const todayCompleted = bookings.filter(a => a.date === todayStr && a.status === 'completed');
@@ -137,11 +164,11 @@ export const AdminView: React.FC = () => {
           </div>
           <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col justify-between h-40">
             <Clock size={24} className="text-amber-500 opacity-50" />
-            <div><p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Solicitudes Pendientes</p><p className="text-3xl font-black text-slate-800">{bookings.filter(b => b.status === 'pending').length}</p></div>
+            <div><p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Pendientes</p><p className="text-3xl font-black text-slate-800">{bookings.filter(b => b.status === 'pending').length}</p></div>
           </div>
           <div className="bg-slate-900 p-6 rounded-[2.5rem] text-white shadow-2xl shadow-slate-200 flex flex-col justify-between h-40">
             <TrendingUp size={24} className="text-emerald-400 opacity-50" />
-            <div><p className="text-[10px] font-black uppercase tracking-widest opacity-80">Pacientes Totales</p><p className="text-3xl font-black">{allUsers.filter(u => u.role === 'client').length}</p></div>
+            <div><p className="text-[10px] font-black uppercase tracking-widest opacity-80">Pacientes</p><p className="text-3xl font-black">{allUsers.filter(u => u.role === 'client').length}</p></div>
           </div>
           <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col justify-between h-40">
             <CalendarIcon size={24} className="text-sky-500 opacity-50" />
@@ -151,10 +178,10 @@ export const AdminView: React.FC = () => {
         
         <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm">
           <h3 className="text-lg font-black text-slate-900 mb-6 flex items-center gap-2">
-            <Activity className="text-sky-500" /> Actividad Reciente
+            <Activity className="text-sky-500" size={20} /> Actividad Reciente
           </h3>
           <div className="space-y-4">
-            {bookings.slice(0, 5).map(app => (
+            {bookings.length > 0 ? bookings.slice(0, 5).map(app => (
               <div key={app.id} className="flex items-center justify-between p-5 bg-slate-50 rounded-3xl border border-slate-100">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center font-black text-sky-500 shadow-sm">{app.clientName?.charAt(0)}</div>
@@ -165,12 +192,15 @@ export const AdminView: React.FC = () => {
                 </div>
                 <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest ${
                   app.status === 'approved' ? 'bg-emerald-50 text-emerald-600' : 
-                  app.status === 'pending' ? 'bg-amber-50 text-amber-600' : 'bg-slate-200 text-slate-500'
+                  app.status === 'pending' ? 'bg-amber-50 text-amber-600' : 
+                  app.status === 'rejected' ? 'bg-rose-50 text-rose-600' : 'bg-slate-200 text-slate-500'
                 }`}>
                   {app.status}
                 </span>
               </div>
-            ))}
+            )) : (
+              <p className="text-center py-10 text-slate-300 font-bold uppercase text-[10px]">No hay actividad reciente</p>
+            )}
           </div>
         </div>
       </div>
@@ -178,64 +208,130 @@ export const AdminView: React.FC = () => {
   };
 
   const renderCalendar = () => {
-    const [selectedDateFilter, setSelectedDateFilter] = useState(todayStr);
-    const dayAppointments = appointments.filter(a => a.date === selectedDateFilter);
+    const dayAppointments = appointments.filter(a => a.date === selectedDate);
+    const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
     return (
       <div className="space-y-8 animate-in fade-in duration-500">
-        <div className="flex flex-col md:flex-row gap-8">
-          <div className="w-full md:w-80 space-y-4">
+        <div className="flex flex-col lg:flex-row gap-8">
+          <div className="w-full lg:w-[450px] space-y-6">
             <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm">
-              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-6">Agenda Diaria</h4>
-              <input 
-                type="date" 
-                value={selectedDateFilter} 
-                onChange={e => setSelectedDateFilter(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 font-black text-slate-800 outline-none focus:border-sky-500 transition-all mb-4"
-              />
+              <div className="flex items-center justify-between mb-8">
+                <h4 className="text-sm font-black text-slate-900 uppercase tracking-tight">
+                  {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
+                </h4>
+                <div className="flex gap-2">
+                  <button onClick={() => changeMonth(-1)} className="p-2 hover:bg-slate-50 rounded-xl text-slate-400"><ChevronLeft size={20}/></button>
+                  <button onClick={() => changeMonth(1)} className="p-2 hover:bg-slate-50 rounded-xl text-slate-400"><ChevronRight size={20}/></button>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-7 gap-1 mb-4">
+                {['D','L','M','X','J','V','S'].map(d => (
+                  <div key={d} className="text-center text-[10px] font-black text-slate-300 py-2">{d}</div>
+                ))}
+                {calendarDays.map((date, i) => {
+                  if (!date) return <div key={`empty-${i}`} className="p-2"></div>;
+                  const isSelected = date === selectedDate;
+                  const hasAppointments = appointments.some(a => a.date === date && a.status !== 'available');
+                  const hasSlots = appointments.some(a => a.date === date && a.status === 'available');
+
+                  return (
+                    <button 
+                      key={date}
+                      onClick={() => setSelectedDate(date)}
+                      className={`relative p-3 rounded-2xl text-[11px] font-bold transition-all flex items-center justify-center
+                        ${isSelected ? 'bg-sky-500 text-white shadow-lg shadow-sky-100' : 'text-slate-600 hover:bg-slate-50'}
+                      `}
+                    >
+                      {new Date(date).getDate() + 1}
+                      <div className="absolute bottom-1.5 flex gap-0.5">
+                        {hasAppointments && <div className={`w-1 h-1 rounded-full ${isSelected ? 'bg-white' : 'bg-emerald-500'}`}></div>}
+                        {hasSlots && <div className={`w-1 h-1 rounded-full ${isSelected ? 'bg-white/50' : 'bg-sky-300'}`}></div>}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
+
             <button 
-              onClick={() => {
-                setSlotDate(selectedDateFilter);
-                setShowSlotModal(true);
-              }}
-              className="w-full bg-sky-500 text-white py-6 rounded-[2.5rem] font-black uppercase text-[10px] tracking-widest shadow-2xl shadow-sky-100 flex items-center justify-center gap-3 active:scale-95 transition-all"
+              onClick={() => setShowSlotModal(true)}
+              className="w-full bg-slate-900 text-white py-6 rounded-[2.5rem] font-black uppercase text-[10px] tracking-widest shadow-2xl shadow-slate-200 flex items-center justify-center gap-3 active:scale-95 transition-all"
             >
-              <Plus size={20} /> Abrir Nuevo Turno
+              <Plus size={20} /> Abrir Espacio en {selectedDate}
             </button>
           </div>
 
           <div className="flex-1 space-y-6">
-            <div className="grid grid-cols-1 gap-4">
-              {dayAppointments.length > 0 ? dayAppointments.sort((a,b) => a.startTime.localeCompare(b.startTime)).map(app => (
-                <div key={app.id} className={`p-6 rounded-[2.5rem] border transition-all flex flex-col md:flex-row md:items-center justify-between gap-6
-                  ${app.status === 'available' ? 'bg-white border-dashed border-slate-200 opacity-60' : 'bg-white border-slate-100 shadow-sm'}`}>
-                  
-                  <div className="flex items-center gap-6">
-                    <div className={`w-20 h-20 rounded-3xl flex flex-col items-center justify-center font-black shadow-inner
-                      ${app.status === 'available' ? 'bg-slate-50 text-slate-300' : 'bg-sky-50 text-sky-500'}`}>
-                      <span className="text-xl leading-none">{app.startTime}</span>
-                    </div>
-                    <div>
-                      <h4 className={`text-lg font-black ${app.status === 'available' ? 'text-slate-300' : 'text-slate-900'}`}>{app.status === 'available' ? 'Espacio Libre' : app.clientName}</h4>
-                    </div>
+            <div className="bg-white p-8 rounded-[3.5rem] border border-slate-100 shadow-sm h-full min-h-[500px]">
+              <div className="flex items-center justify-between mb-8">
+                <div>
+                  <h3 className="text-2xl font-black text-slate-900 tracking-tight">Agenda Diaria</h3>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{selectedDate}</p>
+                </div>
+                <div className="flex gap-4">
+                  <div className="flex items-center gap-2 text-[9px] font-black uppercase text-slate-400">
+                    <div className="w-2 h-2 rounded-full bg-sky-500"></div> Disponible
                   </div>
+                  <div className="flex items-center gap-2 text-[9px] font-black uppercase text-slate-400">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500"></div> Paciente
+                  </div>
+                </div>
+              </div>
 
-                  <div className="flex items-center gap-3">
-                    {app.status === 'pending' && (
-                      <div className="flex gap-2">
-                        <button onClick={() => updateStatus(app.id, 'approved')} className="bg-emerald-500 text-white px-5 py-3 rounded-2xl text-[9px] font-black uppercase">Aprobar</button>
-                        <button onClick={() => updateStatus(app.id, 'rejected')} className="bg-rose-50 text-rose-600 px-5 py-3 rounded-2xl text-[9px] font-black uppercase">Rechazar</button>
+              <div className="space-y-4">
+                {dayAppointments.length > 0 ? dayAppointments.sort((a,b) => a.startTime.localeCompare(b.startTime)).map(app => (
+                  <div key={app.id} className={`p-6 rounded-[2.5rem] border transition-all flex flex-col md:flex-row md:items-center justify-between gap-6
+                    ${app.status === 'available' ? 'bg-slate-50/50 border-dashed border-slate-200' : 
+                      app.status === 'rejected' ? 'bg-rose-50/30 border-rose-100 grayscale-[0.3]' : 'bg-white border-slate-100 shadow-sm ring-1 ring-slate-50'}`}>
+                    
+                    <div className="flex items-center gap-6">
+                      <div className={`w-16 h-16 rounded-2xl flex flex-col items-center justify-center font-black shadow-inner
+                        ${app.status === 'available' ? 'bg-white text-slate-300' : 
+                          app.status === 'rejected' ? 'bg-rose-100 text-rose-500' : 'bg-sky-500 text-white'}`}>
+                        <span className="text-sm leading-none">{app.startTime}</span>
                       </div>
-                    )}
-                    <button onClick={() => removeAppointment(app.id)} className="p-4 text-slate-200 hover:text-rose-500 rounded-2xl transition-all"><Trash2 size={20} /></button>
+                      <div>
+                        {app.status === 'available' ? (
+                          <h4 className="text-sm font-black text-slate-400 uppercase tracking-widest italic">Espacio para Reserva</h4>
+                        ) : (
+                          <div>
+                            <h4 className="text-lg font-black text-slate-900 leading-tight flex items-center gap-2">
+                              {app.clientName}
+                              {app.status === 'rejected' && <span className="text-[8px] px-2 py-0.5 bg-rose-500 text-white rounded-full">RECHAZADA</span>}
+                            </h4>
+                            <p className="text-[9px] font-bold text-sky-500 uppercase tracking-widest">{app.reason || 'Consulta General'}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      {app.status === 'pending' && (
+                        <>
+                          <button onClick={() => updateStatus(app.id, 'approved')} className="bg-emerald-500 text-white px-6 py-3 rounded-2xl text-[9px] font-black uppercase shadow-lg shadow-emerald-100">Aprobar</button>
+                          <button onClick={() => updateStatus(app.id, 'rejected')} className="bg-rose-50 text-rose-600 px-6 py-3 rounded-2xl text-[9px] font-black uppercase">Rechazar</button>
+                        </>
+                      )}
+                      {app.status === 'approved' && (
+                        <button onClick={() => updateStatus(app.id, 'completed')} className="bg-slate-900 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase">Finalizar</button>
+                      )}
+                      {app.status === 'rejected' && (
+                        <button onClick={() => updateStatus(app.id, 'approved')} className="bg-sky-500 text-white px-6 py-3 rounded-2xl text-[9px] font-black uppercase flex items-center gap-2 shadow-lg shadow-sky-100">
+                          <RefreshCw size={14} /> Re-aprobar
+                        </button>
+                      )}
+                      <button onClick={() => removeAppointment(app.id)} className="p-4 text-slate-200 hover:text-rose-500 hover:bg-rose-50 rounded-2xl transition-all"><Trash2 size={18} /></button>
+                    </div>
                   </div>
-                </div>
-              )) : (
-                <div className="py-32 text-center bg-white rounded-[4rem] border-2 border-dashed border-slate-100">
-                  <p className="text-xs font-black text-slate-300 uppercase tracking-[0.3em]">Sin actividad este día</p>
-                </div>
-              )}
+                )) : (
+                  <div className="py-24 text-center flex flex-col items-center justify-center space-y-4 opacity-20">
+                    <CalendarDays size={60} className="text-slate-300" />
+                    <p className="text-xs font-black uppercase tracking-[0.2em]">Agenda Vacía</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -295,27 +391,49 @@ export const AdminView: React.FC = () => {
         <div className="animate-in slide-in-from-right-12 duration-500 space-y-8 pb-20">
           <button 
             onClick={() => setViewingPatientFile(false)}
-            className="flex items-center gap-3 text-[10px] font-black uppercase text-slate-400 hover:text-slate-900 bg-white px-6 py-3 rounded-full border border-slate-100 shadow-sm"
+            className="flex items-center gap-3 text-[10px] font-black uppercase text-slate-400 hover:text-slate-900 bg-white px-6 py-3 rounded-full border border-slate-100 shadow-sm transition-all"
           >
-            <ChevronRight size={18} className="rotate-180" /> Regresar
+            <ChevronRight size={18} className="rotate-180" /> Regresar al listado
           </button>
 
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
             <div className="lg:col-span-1 space-y-8">
               <div className="bg-white p-10 rounded-[3.5rem] border border-slate-100 shadow-xl text-center">
-                <div className="w-28 h-28 bg-sky-500 text-white rounded-[2.5rem] flex items-center justify-center text-4xl font-black mx-auto mb-6">
+                <div className="w-28 h-28 bg-sky-500 text-white rounded-[2.5rem] flex items-center justify-center text-4xl font-black mx-auto mb-6 shadow-2xl shadow-sky-100">
                   {patient?.name.charAt(0)}
                 </div>
                 <h2 className="text-2xl font-black text-slate-900 mb-2">{patient?.name}</h2>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{patient?.phone}</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">{patient?.phone}</p>
+                <div className="pt-6 border-t border-slate-50 space-y-2">
+                   <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Email</p>
+                   <p className="text-xs font-bold text-slate-800">{patient?.email}</p>
+                </div>
+              </div>
+
+              <div className="bg-slate-900 p-8 rounded-[3rem] text-white">
+                <h4 className="text-[10px] font-black uppercase tracking-widest mb-6 text-sky-400">Próximas Citas</h4>
+                <div className="space-y-4">
+                  {patientApps.filter(a => ['approved', 'pending'].includes(a.status)).map(a => (
+                    <div key={a.id} className="p-4 bg-white/5 rounded-2xl border border-white/10">
+                      <p className="text-[9px] font-black uppercase tracking-widest opacity-40">{a.date}</p>
+                      <p className="text-xs font-bold mt-1">{a.startTime} - {a.status}</p>
+                    </div>
+                  ))}
+                  {patientApps.length === 0 && <p className="text-[10px] opacity-30 italic">Sin actividad registrada</p>}
+                </div>
               </div>
             </div>
 
-            <div className="lg:col-span-3">
-              <div className="bg-white p-12 rounded-[4rem] border border-slate-100">
-                <h3 className="text-2xl font-black text-slate-900 mb-12 flex items-center gap-3">
-                  <Stethoscope size={28} className="text-sky-500" /> Odontograma
-                </h3>
+            <div className="lg:col-span-3 space-y-8">
+              <div className="bg-white p-12 rounded-[4rem] border border-slate-100 shadow-sm relative overflow-hidden">
+                <div className="flex justify-between items-center mb-10">
+                  <div className="space-y-1">
+                    <h3 className="text-2xl font-black text-slate-900 flex items-center gap-3">
+                      <Stethoscope size={28} className="text-sky-500" /> Dentigrama Clínico
+                    </h3>
+                  </div>
+                </div>
+                
                 <Odontogram 
                   toothStates={odontogram} 
                   onUpdateTooth={(id, condition) => {
@@ -329,6 +447,14 @@ export const AdminView: React.FC = () => {
                     updatePatientOdontogram(selectedPatientId!, newOdontogram);
                   }} 
                 />
+
+                <div className="mt-12 p-8 bg-slate-50 rounded-[3rem] border border-slate-200">
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Notas y Observaciones</h4>
+                  <textarea 
+                    placeholder="Escriba aquí la evolución del paciente..."
+                    className="w-full h-40 bg-transparent text-sm font-bold text-slate-800 outline-none resize-none"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -339,32 +465,37 @@ export const AdminView: React.FC = () => {
     return (
       <div className="space-y-8 animate-in fade-in duration-500">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6 px-4">
-          <h3 className="text-3xl font-black text-slate-900 tracking-tight">Base de Pacientes</h3>
-          <input 
-            type="text" 
-            placeholder="Buscar..." 
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            className="w-full md:w-96 pl-8 pr-8 py-5 bg-white border border-slate-200 rounded-[2rem] text-sm font-bold shadow-sm" 
-          />
+          <h3 className="text-3xl font-black text-slate-900 tracking-tight">Gestión de Pacientes</h3>
+          <div className="relative w-full md:w-96">
+            <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+            <input 
+              type="text" 
+              placeholder="Buscar..." 
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="w-full pl-16 pr-8 py-5 bg-white border border-slate-200 rounded-[2rem] text-sm font-bold shadow-sm" 
+            />
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {filtered.map((user) => (
-            <div key={user.id} className="bg-white p-8 rounded-[3.5rem] border border-slate-100 shadow-sm hover:shadow-2xl transition-all group">
-              <div className="flex flex-col items-center text-center">
-                <div className="w-20 h-20 rounded-[2.2rem] bg-slate-50 border border-slate-100 flex items-center justify-center font-black text-slate-400 text-2xl mb-6 group-hover:bg-sky-500 group-hover:text-white transition-all">
+            <div key={user.id} className="bg-white p-8 rounded-[3.5rem] border border-slate-100 shadow-sm hover:shadow-2xl transition-all group relative overflow-hidden">
+               <div className="absolute top-0 right-0 w-24 h-24 bg-sky-50 rounded-full -mr-12 -mt-12 group-hover:bg-sky-500 transition-colors duration-500"></div>
+              
+              <div className="flex flex-col items-center text-center relative z-10">
+                <div className="w-20 h-20 rounded-[2.2rem] bg-slate-50 border border-slate-100 flex items-center justify-center font-black text-slate-400 text-2xl mb-6 group-hover:bg-white group-hover:text-sky-500 transition-all duration-500">
                   {user.name.charAt(0)}
                 </div>
-                <h4 className="text-lg font-black text-slate-800 leading-tight mb-4">{user.name}</h4>
+                <h4 className="text-lg font-black text-slate-800 leading-tight mb-8">{user.name}</h4>
                 <button 
                   onClick={() => {
                     setSelectedPatientId(user.id);
                     setViewingPatientFile(true);
                   }}
-                  className="w-full py-4 bg-slate-50 text-slate-600 rounded-[1.5rem] font-black uppercase text-[9px] tracking-widest flex items-center justify-center gap-2 hover:bg-slate-900 hover:text-white transition-all"
+                  className="w-full py-4 bg-slate-50 text-slate-600 rounded-[1.5rem] font-black uppercase text-[9px] tracking-widest flex items-center justify-center gap-2 hover:bg-slate-900 hover:text-white transition-all shadow-sm"
                 >
-                  <FileText size={16} /> Ver Ficha
+                  <FileText size={16} /> Ver Ficha Médica
                 </button>
               </div>
             </div>
@@ -378,10 +509,30 @@ export const AdminView: React.FC = () => {
     switch (activeTab) {
       case 'Dashboard': return renderDashboard();
       case 'Calendario': return renderCalendar();
-      case 'Analíticas': return <div className="p-10 text-center font-black uppercase text-slate-300">Modulo Analíticas en desarrollo</div>;
       case 'Pacientes': return renderPatients();
       case 'Equipo': return renderEquipo();
-      case 'Ajustes': return <div className="p-10 text-center font-black uppercase text-slate-300">Modulo Ajustes en desarrollo</div>;
+      case 'Analíticas': return (
+         <div className="bg-white p-12 rounded-[4rem] border border-slate-100 shadow-sm text-center py-32">
+          <BarChart size={64} className="mx-auto text-slate-200 mb-6" />
+          <h3 className="text-2xl font-black text-slate-900 mb-2">Panel de Analíticas</h3>
+          <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest">Visualización de datos avanzados</p>
+        </div>
+      );
+      case 'Ajustes': return (
+        <div className="max-w-4xl mx-auto bg-white p-12 rounded-[4rem] border border-slate-100 shadow-sm space-y-10">
+          <h3 className="text-2xl font-black text-slate-900">Configuración del Centro</h3>
+          <div className="grid grid-cols-2 gap-8">
+            <div className="space-y-4">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Inicio Jornada</label>
+              <input type="time" value={availability.startHour} onChange={e => setAvailability({...availability, startHour: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-3xl p-5 font-black" />
+            </div>
+            <div className="space-y-4">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Fin Jornada</label>
+              <input type="time" value={availability.endHour} onChange={e => setAvailability({...availability, endHour: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-3xl p-5 font-black" />
+            </div>
+          </div>
+        </div>
+      );
       default: return renderDashboard();
     }
   };
@@ -390,72 +541,53 @@ export const AdminView: React.FC = () => {
     <div className="pb-32 min-h-screen">
       {renderActiveModule()}
 
-      {/* FAB */}
       <button 
-        onClick={() => { setSlotDate(todayStr); setShowSlotModal(true); }}
-        className="fixed bottom-12 right-12 w-24 h-24 bg-sky-500 text-white rounded-[3rem] shadow-2xl flex items-center justify-center z-[80] border-[8px] border-white hover:bg-sky-600 transition-all"
+        onClick={() => setShowSlotModal(true)}
+        className="fixed bottom-12 right-12 w-24 h-24 bg-sky-500 text-white rounded-[3rem] shadow-2xl flex items-center justify-center z-[80] border-[8px] border-white hover:bg-sky-600 active:scale-90 transition-all group"
       >
-        <PhoneCall size={32} />
+        <Plus size={32} className="group-hover:rotate-90 transition-transform" />
       </button>
 
-      {/* Modal Nuevo Admin */}
       {showAdminModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[100] flex items-center justify-center p-6">
           <div className="bg-white w-full max-w-lg rounded-[4rem] p-12 shadow-2xl animate-in zoom-in-95">
             <div className="flex justify-between items-center mb-10">
-              <h3 className="text-3xl font-black text-slate-900">Nuevo Administrador</h3>
-              <button onClick={() => setShowAdminModal(false)}><X size={24} /></button>
+              <h3 className="text-3xl font-black text-slate-900">Nuevo Admin</h3>
+              <button onClick={() => setShowAdminModal(false)}><X size={24}/></button>
             </div>
             <form onSubmit={createAdmin} className="space-y-6">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Nombre Completo</label>
-                <div className="relative">
-                  <Users className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-                  <input required type="text" value={newAdminData.name} onChange={e => setNewAdminData({...newAdminData, name: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-[2rem] pl-16 pr-8 py-5 font-bold" placeholder="Nombre completo" />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Email Profesional</label>
-                <div className="relative">
-                  <Mail className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-                  <input required type="email" value={newAdminData.email} onChange={e => setNewAdminData({...newAdminData, email: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-[2rem] pl-16 pr-8 py-5 font-bold" placeholder="email@clinica.com" />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Teléfono</label>
-                <div className="relative">
-                  <Phone className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-                  <input required type="tel" value={newAdminData.phone} onChange={e => setNewAdminData({...newAdminData, phone: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-[2rem] pl-16 pr-8 py-5 font-bold" placeholder="Teléfono" />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Asignar Contraseña</label>
-                <div className="relative">
-                  <Lock className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-                  <input required type="password" value={newAdminData.password} onChange={e => setNewAdminData({...newAdminData, password: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-[2rem] pl-16 pr-8 py-5 font-bold" placeholder="••••••••" />
-                </div>
-              </div>
-              <button type="submit" className="w-full py-6 bg-slate-900 text-white rounded-[2.5rem] font-black uppercase tracking-widest shadow-2xl mt-4">Registrar en el Sistema</button>
+              <input required type="text" value={newAdminData.name} onChange={e => setNewAdminData({...newAdminData, name: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-[2rem] px-8 py-5 font-bold" placeholder="Nombre" />
+              <input required type="email" value={newAdminData.email} onChange={e => setNewAdminData({...newAdminData, email: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-[2rem] px-8 py-5 font-bold" placeholder="Email" />
+              <input required type="password" value={newAdminData.password} onChange={e => setNewAdminData({...newAdminData, password: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-[2rem] px-8 py-5 font-bold" placeholder="Contraseña" />
+              <button type="submit" className="w-full py-6 bg-slate-900 text-white rounded-[2.5rem] font-black uppercase tracking-widest mt-4">Guardar</button>
             </form>
           </div>
         </div>
       )}
 
-      {/* Modal Nuevo Turno */}
       {showSlotModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[100] flex items-center justify-center p-6">
-          <div className="bg-white w-full max-w-lg rounded-[4rem] p-12 shadow-2xl animate-in zoom-in-95 duration-300">
+          <div className="bg-white w-full max-w-lg rounded-[4rem] p-12 shadow-2xl animate-in zoom-in-95">
             <div className="flex justify-between items-center mb-10">
               <h3 className="text-3xl font-black text-slate-900 leading-tight">Abrir Turno</h3>
-              <button onClick={() => setShowSlotModal(false)}><X size={24} /></button>
+              <button onClick={() => setShowSlotModal(false)}><X size={24}/></button>
             </div>
             <form onSubmit={createSlot} className="space-y-8">
-              <input required type="date" value={slotDate} onChange={e => setSlotDate(e.target.value)} min={todayStr} className="w-full bg-slate-50 border border-slate-200 rounded-[2rem] px-8 py-5 font-black text-lg" />
-              <div className="grid grid-cols-2 gap-6">
-                <input required type="time" value={slotStart} onChange={e => setSlotStart(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-[2rem] px-8 py-5 font-black text-lg" />
-                <input required type="time" value={slotEnd} onChange={e => setSlotEnd(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-[2rem] px-8 py-5 font-black text-lg" />
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Fecha</label>
+                <input required type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} min={todayStr} className="w-full bg-slate-50 border border-slate-200 rounded-[2rem] px-8 py-5 font-black text-lg" />
               </div>
-              <button type="submit" className="w-full py-6 bg-slate-900 text-white rounded-[2.5rem] font-black uppercase tracking-widest shadow-2xl shadow-slate-200 mt-4 active:scale-95 transition-all">Publicar en Agenda</button>
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Inicio</label>
+                  <input required type="time" value={slotStart} onChange={e => setSlotStart(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-[2rem] px-8 py-5 font-black text-lg" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Fin</label>
+                  <input required type="time" value={slotEnd} onChange={e => setSlotEnd(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-[2rem] px-8 py-5 font-black text-lg" />
+                </div>
+              </div>
+              <button type="submit" className="w-full py-6 bg-slate-900 text-white rounded-[2.5rem] font-black uppercase tracking-widest shadow-2xl mt-4 active:scale-95 transition-all">Habilitar Horario</button>
             </form>
           </div>
         </div>
