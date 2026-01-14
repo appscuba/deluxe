@@ -16,6 +16,8 @@ interface AppContextType {
   addNotification: (userId: string, title: string, message: string, type: Notification['type']) => void;
   availability: ClinicAvailability;
   setAvailability: React.Dispatch<React.SetStateAction<ClinicAvailability>>;
+  activeTab: string;
+  setActiveTab: (tab: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -50,6 +52,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const saved = localStorage.getItem('dental_availability');
     return saved ? JSON.parse(saved) : DEFAULT_AVAILABILITY;
   });
+
+  const [activeTab, setActiveTab] = useState('Dashboard');
 
   useEffect(() => {
     localStorage.setItem('dental_user', JSON.stringify(currentUser));
@@ -95,7 +99,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       appointments, setAppointments,
       treatments, setTreatments,
       notifications, addNotification,
-      availability, setAvailability
+      availability, setAvailability,
+      activeTab, setActiveTab
     }}>
       {children}
     </AppContext.Provider>

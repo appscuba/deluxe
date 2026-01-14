@@ -26,6 +26,7 @@ const AuthScreen: React.FC = () => {
     const DEFAULT_ADMIN_PASS = 'Asd9310*';
 
     if (authMode === 'login') {
+      // Admin Login
       if (formData.email === DEFAULT_ADMIN_EMAIL) {
         if (formData.password === DEFAULT_ADMIN_PASS) {
           setCurrentUser({
@@ -43,28 +44,25 @@ const AuthScreen: React.FC = () => {
         }
       }
 
+      // Client Login
       const existingUser = allUsers.find(u => u.email === formData.email);
       if (existingUser) {
+        // En una app real aquí validaríamos la contraseña
         setCurrentUser(existingUser);
         return;
       }
 
-      if (formData.email.length > 0) {
-        const newUser: User = {
-          id: Math.random().toString(36).substr(2, 9),
-          name: formData.email.split('@')[0],
-          email: formData.email,
-          phone: '000000000',
-          role: 'client',
-          createdAt: new Date().toISOString()
-        };
-        setAllUsers(prev => [...prev, newUser]);
-        setCurrentUser(newUser);
-      }
+      setError('Usuario no encontrado. Por favor, crea una cuenta primero.');
     } else {
+      // Registration logic
       const emailExists = allUsers.some(u => u.email === formData.email) || formData.email === DEFAULT_ADMIN_EMAIL;
       if (emailExists) {
         setError('Este correo ya está registrado.');
+        return;
+      }
+
+      if (!formData.phone || formData.phone.length < 7) {
+        setError('Por favor, ingresa un número de teléfono válido.');
         return;
       }
 
@@ -120,7 +118,7 @@ const AuthScreen: React.FC = () => {
           <form onSubmit={handleAuth} className="space-y-5">
             {authMode === 'register' && (
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nombre</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nombre Completo</label>
                 <div className="relative">
                   <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                   <input 
@@ -128,7 +126,7 @@ const AuthScreen: React.FC = () => {
                     type="text" 
                     value={formData.name}
                     onChange={(e) => setFormData({...formData, name: e.target.value})}
-                    placeholder="Tu nombre completo"
+                    placeholder="Ej: Juan Pérez"
                     className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-12 py-4 focus:outline-none focus:ring-4 focus:ring-sky-500/10 focus:border-sky-500 transition-all font-bold text-slate-800"
                   />
                 </div>
@@ -150,6 +148,23 @@ const AuthScreen: React.FC = () => {
               </div>
             </div>
 
+            {authMode === 'register' && (
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Teléfono (Obligatorio)</label>
+                <div className="relative">
+                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                  <input 
+                    required
+                    type="tel" 
+                    value={formData.phone}
+                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                    placeholder="+54 9 11 0000-0000"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-12 py-4 focus:outline-none focus:ring-4 focus:ring-sky-500/10 focus:border-sky-500 transition-all font-bold text-slate-800"
+                  />
+                </div>
+              </div>
+            )}
+
             <div className="space-y-1.5">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Contraseña</label>
               <div className="relative">
@@ -169,7 +184,7 @@ const AuthScreen: React.FC = () => {
               type="submit"
               className="w-full py-5 rounded-[1.8rem] font-black shadow-2xl transition-all flex items-center justify-center gap-3 mt-8 active:scale-95 bg-sky-500 text-white shadow-sky-200 hover:bg-sky-600"
             >
-              {authMode === 'register' ? 'Crear Cuenta' : 'Iniciar Sesión'}
+              {authMode === 'register' ? 'Registrarme ahora' : 'Iniciar Sesión'}
               <ArrowRight size={20} />
             </button>
           </form>

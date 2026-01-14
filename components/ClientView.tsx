@@ -15,7 +15,6 @@ import {
   Search,
   CheckCircle2
 } from 'lucide-react';
-import { getDentalAdvice } from '../services/geminiService';
 
 const SYMPTOMS = [
   { id: 'pain', label: 'Dolor Agudo', icon: '⚡' },
@@ -42,10 +41,6 @@ export const ClientView: React.FC = () => {
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
   const [urgency, setUrgency] = useState<UrgencyLevel>('low');
   const [reason, setReason] = useState('');
-  
-  const [aiQuestion, setAiQuestion] = useState('');
-  const [aiResponse, setAiResponse] = useState('');
-  const [loadingAi, setLoadingAi] = useState(false);
 
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -92,14 +87,6 @@ export const ClientView: React.FC = () => {
 
   const resetForm = () => {
     setStep(1); setSelectedSymptoms([]); setSelectedImprovements([]); setSelectedSlotId(null); setReason(''); setUrgency('low');
-  };
-
-  const askGemini = async () => {
-    if (!aiQuestion) return;
-    setLoadingAi(true);
-    const response = await getDentalAdvice(aiQuestion);
-    setAiResponse(response || '');
-    setLoadingAi(false);
   };
 
   return (
@@ -168,23 +155,21 @@ export const ClientView: React.FC = () => {
         </div>
 
         <div className="space-y-8">
-          <div className="bg-slate-900 rounded-[3rem] p-10 text-white shadow-2xl relative overflow-hidden group">
-            <h3 className="text-2xl font-black mb-2 leading-tight">Asistente Deluxe AI</h3>
-            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-8">Consultas Médicas Rápidas</p>
-            <div className="space-y-4 relative">
-              <input value={aiQuestion} onChange={(e) => setAiQuestion(e.target.value)} placeholder="¿Cómo cuidar el blanqueamiento?" className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-sm focus:outline-none focus:bg-white/10" />
-              <button onClick={askGemini} disabled={loadingAi} className="w-full py-4 bg-sky-500 rounded-2xl font-black uppercase text-[10px] tracking-widest active:scale-95 disabled:opacity-50">
-                {loadingAi ? 'Analizando...' : 'Consultar'}
-              </button>
-              {aiResponse && <div className="bg-white/5 rounded-2xl p-6 text-[11px] text-slate-300 leading-relaxed border border-white/5">{aiResponse}</div>}
-            </div>
-          </div>
-          
           <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm">
             <h3 className="font-black text-slate-800 mb-6 flex items-center gap-3">
               <CheckCircle2 size={20} className="text-emerald-500" /> Garantía Deluxe
             </h3>
-            <p className="text-xs text-slate-400 font-medium leading-relaxed">En Deluxe Dental Care, cada cita es personalizada. No te preocupes por el precio hoy; nuestros expertos evaluarán tu caso y te darán la mejor opción clínica.</p>
+            <p className="text-xs text-slate-400 font-medium leading-relaxed">En Deluxe Dental Care, cada cita es personalizada. Nuestros expertos evaluarán tu caso y te darán la mejor opción clínica basada en tus síntomas y objetivos.</p>
+          </div>
+
+          <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm">
+            <h3 className="font-black text-slate-800 mb-4 flex items-center gap-3">
+              <AlertCircle size={20} className="text-sky-500" /> Tu Perfil
+            </h3>
+            <div className="space-y-2 text-xs font-bold text-slate-500">
+              <p>Email: {currentUser?.email}</p>
+              <p>Teléfono: {currentUser?.phone}</p>
+            </div>
           </div>
         </div>
       </div>

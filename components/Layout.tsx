@@ -4,7 +4,6 @@ import { useAppContext } from '../context/AppContext';
 import { 
   Calendar, 
   LayoutDashboard, 
-  ClipboardList, 
   Settings, 
   Users, 
   LogOut, 
@@ -17,7 +16,7 @@ import {
 } from 'lucide-react';
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUser, setCurrentUser, notifications } = useAppContext();
+  const { currentUser, setCurrentUser, notifications, activeTab, setActiveTab } = useAppContext();
   const [isSidebarOpen, setSidebarOpen] = useState(false);
 
   if (!currentUser) return <>{children}</>;
@@ -25,14 +24,23 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   const isAdmin = currentUser.role === 'admin';
   const unreadCount = notifications.filter(n => !n.read && n.userId === currentUser.id).length;
 
-  const NavItem = ({ icon: Icon, label, active = false }: any) => (
-    <button className={`w-full flex items-center space-x-3 px-5 py-4 rounded-2xl transition-all duration-300 ${
-      active ? 'bg-slate-900 text-white shadow-xl shadow-slate-200' : 'text-slate-500 hover:bg-slate-50'
-    }`}>
-      <Icon size={20} className={active ? 'text-sky-400' : ''} />
-      <span className="font-bold text-sm tracking-tight">{label}</span>
-    </button>
-  );
+  const NavItem = ({ icon: Icon, label }: any) => {
+    const isActive = activeTab === label;
+    return (
+      <button 
+        onClick={() => {
+          setActiveTab(label);
+          setSidebarOpen(false);
+        }}
+        className={`w-full flex items-center space-x-3 px-5 py-4 rounded-2xl transition-all duration-300 ${
+          isActive ? 'bg-slate-900 text-white shadow-xl shadow-slate-200' : 'text-slate-500 hover:bg-slate-50'
+        }`}
+      >
+        <Icon size={20} className={isActive ? 'text-sky-400' : ''} />
+        <span className="font-bold text-sm tracking-tight">{label}</span>
+      </button>
+    );
+  };
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden font-sans">
@@ -44,7 +52,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
         />
       )}
 
-      {/* Sidebar - Redesigned for mobile-first feel */}
+      {/* Sidebar */}
       <aside className={`
         fixed inset-y-0 left-0 z-[100] w-[80%] max-w-[300px] bg-white transform transition-transform duration-500 ease-in-out lg:relative lg:translate-x-0 lg:w-72
         ${isSidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}
@@ -65,7 +73,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           <nav className="flex-1 space-y-2">
             {isAdmin ? (
               <>
-                <NavItem icon={LayoutDashboard} label="Dashboard" active />
+                <NavItem icon={LayoutDashboard} label="Dashboard" />
                 <NavItem icon={Calendar} label="Calendario" />
                 <NavItem icon={BarChart3} label="Analíticas" />
                 <NavItem icon={Users} label="Pacientes" />
@@ -73,7 +81,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
               </>
             ) : (
               <>
-                <NavItem icon={LayoutDashboard} label="Inicio" active />
+                <NavItem icon={LayoutDashboard} label="Inicio" />
                 <NavItem icon={Calendar} label="Mis Reservas" />
                 <NavItem icon={UserIcon} label="Mi Perfil" />
                 <NavItem icon={Settings} label="Ajustes" />
@@ -116,7 +124,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                <div className="w-10 h-10 bg-sky-500 text-white rounded-2xl flex items-center justify-center font-black shadow-lg shadow-sky-100">
                 {currentUser.name.charAt(0)}
               </div>
-              <div className="hidden sm:block">
+              <div className="hidden sm:block text-left">
                 <p className="text-xs font-black text-slate-900 leading-none">{currentUser.name}</p>
                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">{isAdmin ? 'Admin' : 'Paciente'}</p>
               </div>
