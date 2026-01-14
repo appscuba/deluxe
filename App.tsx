@@ -26,33 +26,28 @@ const AuthScreen: React.FC = () => {
     const DEFAULT_ADMIN_PASS = 'Asd9310*';
 
     if (authMode === 'login') {
-      // Admin Login
-      if (formData.email === DEFAULT_ADMIN_EMAIL) {
-        if (formData.password === DEFAULT_ADMIN_PASS) {
-          setCurrentUser({
-            id: 'admin_root',
-            name: 'Admin Principal',
-            email: formData.email,
-            phone: '000000000',
-            role: 'admin',
-            createdAt: new Date().toISOString()
-          });
-          return;
-        } else {
-          setError('Credenciales de administrador inválidas.');
-          return;
-        }
+      // Root Admin Login
+      if (formData.email === DEFAULT_ADMIN_EMAIL && formData.password === DEFAULT_ADMIN_PASS) {
+        setCurrentUser({
+          id: 'admin_root',
+          name: 'Admin Principal',
+          email: formData.email,
+          phone: '000000000',
+          role: 'admin',
+          createdAt: new Date().toISOString()
+        });
+        return;
       }
 
-      // Client Login
+      // Dynamic User Login (Clients or other Admins)
       const existingUser = allUsers.find(u => u.email === formData.email);
       if (existingUser) {
-        // En una app real aquí validaríamos la contraseña
+        // Nota: En una app real validaríamos el password aquí
         setCurrentUser(existingUser);
         return;
       }
 
-      setError('Usuario no encontrado. Por favor, crea una cuenta primero.');
+      setError('Usuario no encontrado o credenciales incorrectas.');
     } else {
       // Registration logic
       const emailExists = allUsers.some(u => u.email === formData.email) || formData.email === DEFAULT_ADMIN_EMAIL;

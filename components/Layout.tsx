@@ -12,7 +12,8 @@ import {
   Menu,
   X,
   User as UserIcon,
-  BarChart3
+  BarChart3,
+  ShieldCheck
 } from 'lucide-react';
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -77,6 +78,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                 <NavItem icon={Calendar} label="Calendario" />
                 <NavItem icon={BarChart3} label="Analíticas" />
                 <NavItem icon={Users} label="Pacientes" />
+                <NavItem icon={ShieldCheck} label="Equipo" />
                 <NavItem icon={Settings} label="Ajustes" />
               </>
             ) : (
