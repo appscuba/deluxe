@@ -35,13 +35,13 @@ const DEFAULT_SETTINGS: ClinicSettings = {
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Helpers para cargar datos de forma segura
   const getSaved = (key: string, fallback: any) => {
     try {
       const saved = localStorage.getItem(key);
-      return saved ? JSON.parse(saved) : fallback;
+      if (saved === null || saved === 'undefined') return fallback;
+      return JSON.parse(saved);
     } catch (e) {
-      console.error(`Error loading ${key}`, e);
+      console.error(`Error loading key: ${key}`, e);
       return fallback;
     }
   };
@@ -55,14 +55,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [patientRecords, setPatientRecords] = useState<PatientRecord[]>(() => getSaved('dental_patient_records', []));
   const [activeTab, setActiveTab] = useState('Dashboard');
 
-  // Efectos de persistencia (Database Mock)
-  useEffect(() => { localStorage.setItem('dental_user', JSON.stringify(currentUser)); }, [currentUser]);
-  useEffect(() => { localStorage.setItem('dental_all_users', JSON.stringify(allUsers)); }, [allUsers]);
-  useEffect(() => { localStorage.setItem('dental_appointments', JSON.stringify(appointments)); }, [appointments]);
-  useEffect(() => { localStorage.setItem('dental_treatments', JSON.stringify(treatments)); }, [treatments]);
-  useEffect(() => { localStorage.setItem('dental_notifications', JSON.stringify(notifications)); }, [notifications]);
-  useEffect(() => { localStorage.setItem('dental_clinic_settings', JSON.stringify(clinicSettings)); }, [clinicSettings]);
-  useEffect(() => { localStorage.setItem('dental_patient_records', JSON.stringify(patientRecords)); }, [patientRecords]);
+  // Sincronización robusta con localStorage
+  useEffect(() => {
+    localStorage.setItem('dental_user', JSON.stringify(currentUser));
+  }, [currentUser]);
+
+  useEffect(() => {
+    localStorage.setItem('dental_all_users', JSON.stringify(allUsers));
+  }, [allUsers]);
+
+  useEffect(() => {
+    localStorage.setItem('dental_appointments', JSON.stringify(appointments));
+  }, [appointments]);
+
+  useEffect(() => {
+    localStorage.setItem('dental_treatments', JSON.stringify(treatments));
+  }, [treatments]);
+
+  useEffect(() => {
+    localStorage.setItem('dental_notifications', JSON.stringify(notifications));
+  }, [notifications]);
+
+  useEffect(() => {
+    localStorage.setItem('dental_clinic_settings', JSON.stringify(clinicSettings));
+  }, [clinicSettings]);
+
+  useEffect(() => {
+    localStorage.setItem('dental_patient_records', JSON.stringify(patientRecords));
+  }, [patientRecords]);
 
   const addNotification = (userId: string, title: string, message: string, type: Notification['type']) => {
     const newNotif: Notification = {
