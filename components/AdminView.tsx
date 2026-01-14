@@ -38,7 +38,10 @@ import {
   Database,
   UploadCloud,
   Save,
-  Info
+  Info,
+  Archive,
+  Edit2,
+  AlertTriangle
 } from 'lucide-react';
 import { AreaChart, Area, Tooltip, ResponsiveContainer, BarChart as RechartsBar, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 
@@ -65,6 +68,7 @@ export const AdminView: React.FC = () => {
   const [showSlotModal, setShowSlotModal] = useState(false);
   const [showAdminModal, setShowAdminModal] = useState(false);
   const [showBillingModal, setShowBillingModal] = useState(false);
+  const [showEditPatientModal, setShowEditPatientModal] = useState(false);
   
   // Estados de formulario
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -73,6 +77,9 @@ export const AdminView: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [newAdminData, setNewAdminData] = useState({ name: '', email: '', password: '' });
   
+  // Edición de Paciente
+  const [patientToEdit, setPatientToEdit] = useState<User | null>(null);
+
   // Facturación
   const [billingAppointment, setBillingAppointment] = useState<Appointment | null>(null);
   const [billingAmount, setBillingAmount] = useState<number>(0);
@@ -119,23 +126,20 @@ export const AdminView: React.FC = () => {
       availability: availability,
       patientRecords: patientRecords,
       exportDate: new Date().toISOString(),
-      version: "1.0"
+      version: "1.2"
     };
 
-    // Crear estructura XML básica
     let xmlString = '<?xml version="1.0" encoding="UTF-8"?>\n';
-    xmlString += '<DeluxeDentalBackup>\n';
-    xmlString += `  <Metadata>\n    <Date>${data.exportDate}</Date>\n    <Version>${data.version}</Version>\n  </Metadata>\n`;
-    
-    // Serializar el objeto principal como CDATA para garantizar integridad absoluta
-    xmlString += `  <Payload><![CDATA[${JSON.stringify(data)}]]></Payload>\n`;
-    xmlString += '</DeluxeDentalBackup>';
+    xmlString += '<DeluxeDentalSystemBackup>\n';
+    xmlString += `  <Metadata>\n    <ClinicName>Deluxe Dental Care</ClinicName>\n    <GeneratedAt>${data.exportDate}</GeneratedAt>\n    <Version>${data.version}</Version>\n  </Metadata>\n`;
+    xmlString += `  <DataPayload><![CDATA[${JSON.stringify(data)}]]></DataPayload>\n`;
+    xmlString += '</DeluxeDentalSystemBackup>';
 
     const blob = new Blob([xmlString], { type: 'text/xml' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `DeluxeDental_Backup_${new Date().toISOString().split('T')[0]}.xml`;
+    link.download = `DeluxeDental_FULL_BACKUP_${new Date().toISOString().replace(/[:.]/g, '-')}.xml`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -151,13 +155,12 @@ export const AdminView: React.FC = () => {
         const content = event.target?.result as string;
         const parser = new DOMParser();
         const xmlDoc = parser.parseFromString(content, "text/xml");
-        const payloadNode = xmlDoc.getElementsByTagName("Payload")[0];
+        const payloadNode = xmlDoc.getElementsByTagName("DataPayload")[0];
         
-        if (!payloadNode) throw new Error("Archivo XML no válido para Deluxe Dental.");
+        if (!payloadNode) throw new Error("El archivo XML no tiene el formato de respaldo de Deluxe Dental.");
 
         const jsonData = JSON.parse(payloadNode.textContent || "");
         
-        // Restauración de estados
         if (jsonData.users) setAllUsers(jsonData.users);
         if (jsonData.appointments) setAppointments(jsonData.appointments);
         if (jsonData.treatments) setTreatments(jsonData.treatments);
@@ -165,17 +168,39 @@ export const AdminView: React.FC = () => {
         if (jsonData.availability) setAvailability(jsonData.availability);
         if (jsonData.patientRecords) setPatientRecords(jsonData.patientRecords);
 
-        alert("¡Sistema restaurado con éxito!");
+        alert("¡Base de datos restaurada correctamente! Toda la información ha sido sincronizada.");
         if (fileInputRef.current) fileInputRef.current.value = '';
       } catch (error) {
-        console.error("Error al importar:", error);
-        alert("Error al procesar el archivo de respaldo. Asegúrate de que es un archivo XML válido generado por esta aplicación.");
+        console.error("Error al restaurar:", error);
+        alert("Error crítico al importar el archivo. Formato incompatible.");
       }
     };
     reader.readAsText(file);
   };
 
-  // --- Funciones de Gestión ---
+  // --- Funciones de Gestión de Pacientes ---
+
+  const handleDeletePatient = (id: string) => {
+    if (confirm('¿Estás seguro de que deseas eliminar permanentemente a este paciente? Se perderán todas sus citas e historial clínico.')) {
+      setAllUsers(prev => prev.filter(u => u.id !== id));
+      setAppointments(prev => prev.filter(a => a.clientId !== id));
+      setPatientRecords(prev => prev.filter(r => r.patientId !== id));
+      if (selectedPatientId === id) setViewingPatientFile(false);
+      alert('Paciente eliminado correctamente.');
+    }
+  };
+
+  const handleUpdatePatient = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!patientToEdit) return;
+
+    setAllUsers(prev => prev.map(u => u.id === patientToEdit.id ? patientToEdit : u));
+    setShowEditPatientModal(false);
+    setPatientToEdit(null);
+    alert('Información del paciente actualizada con éxito.');
+  };
+
+  // --- Funciones de Gestión de Citas ---
 
   const updateStatus = (id: string, newStatus: Appointment['status']) => {
     if (newStatus === 'completed') {
@@ -210,7 +235,7 @@ export const AdminView: React.FC = () => {
     setAppointments(prev => prev.map(app => {
       if (app.id === billingAppointment.id) {
         if (app.clientId) {
-          addNotification(app.clientId, "Tratamiento Finalizado", `Se ha registrado el pago de $${billingAmount}. ¡Gracias por confiar en nosotros!`, 'status_change');
+          addNotification(app.clientId, "Cita Finalizada", `Tu tratamiento ha sido registrado. Pago recibido: $${billingAmount}. ¡Gracias!`, 'status_change');
         }
         return { ...app, status: 'completed', paidAmount: billingAmount };
       }
@@ -264,7 +289,7 @@ export const AdminView: React.FC = () => {
     }
   };
 
-  // --- Renders ---
+  // --- Renders de Módulos ---
 
   const renderDashboard = () => {
     const todayCompleted = bookings.filter(a => a.date === todayStr && a.status === 'completed');
@@ -275,25 +300,25 @@ export const AdminView: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-sky-500 p-6 rounded-[2.5rem] text-white shadow-2xl shadow-sky-100 flex flex-col justify-between h-40">
             <DollarSign size={24} className="opacity-50" />
-            <div><p className="text-[10px] font-black uppercase tracking-widest opacity-80">Ingresos Hoy (Facturado)</p><p className="text-3xl font-black">${earningsToday}</p></div>
+            <div><p className="text-[10px] font-black uppercase tracking-widest opacity-80">Ingresos Hoy (Confirmado)</p><p className="text-3xl font-black">${earningsToday}</p></div>
           </div>
           <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col justify-between h-40">
             <Clock size={24} className="text-amber-500 opacity-50" />
-            <div><p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Pendientes</p><p className="text-3xl font-black text-slate-800">{bookings.filter(b => b.status === 'pending').length}</p></div>
+            <div><p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Solicitudes Pendientes</p><p className="text-3xl font-black text-slate-800">{bookings.filter(b => b.status === 'pending').length}</p></div>
           </div>
           <div className="bg-slate-900 p-6 rounded-[2.5rem] text-white shadow-2xl shadow-slate-200 flex flex-col justify-between h-40">
             <TrendingUp size={24} className="text-emerald-400 opacity-50" />
-            <div><p className="text-[10px] font-black uppercase tracking-widest opacity-80">Pacientes</p><p className="text-3xl font-black">{allUsers.filter(u => u.role === 'client').length}</p></div>
+            <div><p className="text-[10px] font-black uppercase tracking-widest opacity-80">Total Pacientes</p><p className="text-3xl font-black">{allUsers.filter(u => u.role === 'client').length}</p></div>
           </div>
           <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col justify-between h-40">
             <CalendarIcon size={24} className="text-sky-500 opacity-50" />
-            <div><p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Citas Hoy</p><p className="text-3xl font-black text-slate-800">{bookings.filter(b => b.date === todayStr).length}</p></div>
+            <div><p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Citas para Hoy</p><p className="text-3xl font-black text-slate-800">{bookings.filter(b => b.date === todayStr).length}</p></div>
           </div>
         </div>
         
         <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm">
           <h3 className="text-lg font-black text-slate-900 mb-6 flex items-center gap-2">
-            <Activity className="text-sky-500" size={20} /> Actividad Reciente
+            <Activity className="text-sky-500" size={20} /> Resumen de Actividad Diaria
           </h3>
           <div className="space-y-4">
             {bookings.length > 0 ? bookings.slice(0, 5).map(app => (
@@ -318,12 +343,102 @@ export const AdminView: React.FC = () => {
                 </div>
               </div>
             )) : (
-              <p className="text-center py-10 text-slate-300 font-bold uppercase text-[10px]">No hay actividad reciente</p>
+              <p className="text-center py-10 text-slate-300 font-bold uppercase text-[10px]">Sin movimientos registrados recientemente</p>
             )}
           </div>
         </div>
       </div>
     );
+  };
+
+  const renderActiveModule = () => {
+    switch (activeTab) {
+      case 'Dashboard': return renderDashboard();
+      case 'Calendario': return renderCalendar();
+      case 'Pacientes': return renderPatients();
+      case 'Equipo': return renderEquipo();
+      case 'Analíticas': return (
+         <div className="bg-white p-12 rounded-[4rem] border border-slate-100 shadow-sm text-center py-32">
+          <BarChart size={64} className="mx-auto text-slate-200 mb-6" />
+          <h3 className="text-2xl font-black text-slate-900 mb-2">Panel de Analíticas</h3>
+          <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest">Informes de rendimiento próximamente</p>
+        </div>
+      );
+      case 'Ajustes': return (
+        <div className="max-w-4xl mx-auto space-y-10 animate-in fade-in duration-500">
+          <div className="bg-white p-12 rounded-[4rem] border border-slate-100 shadow-sm space-y-10">
+            <h3 className="text-2xl font-black text-slate-900 flex items-center gap-3">
+              <Settings className="text-sky-500" size={28} /> Configuración de Operación
+            </h3>
+            <div className="grid grid-cols-2 gap-8">
+              <div className="space-y-4">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Apertura Clínica</label>
+                <input type="time" value={availability.startHour} onChange={e => setAvailability({...availability, startHour: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-3xl p-5 font-black text-xl" />
+              </div>
+              <div className="space-y-4">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Cierre Clínica</label>
+                <input type="time" value={availability.endHour} onChange={e => setAvailability({...availability, endHour: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-3xl p-5 font-black text-xl" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-12 rounded-[4rem] border border-slate-100 shadow-sm space-y-10">
+            <div className="flex items-center justify-between">
+              <h3 className="text-2xl font-black text-slate-900 flex items-center gap-3">
+                <Database className="text-emerald-500" size={28} /> Módulo de Backup y Restauración
+              </h3>
+              <div className="flex items-center gap-2 bg-emerald-50 px-4 py-2 rounded-2xl border border-emerald-100">
+                <ShieldCheck size={14} className="text-emerald-500" />
+                <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">Formato Seguro XML</span>
+              </div>
+            </div>
+
+            <p className="text-sm text-slate-500 font-medium leading-relaxed">
+              Resguarda toda la información de la clínica. Genera archivos de salvaguarda que incluyen pacientes, turnos, odontogramas y registros de facturación para procesos de mantenimiento o migración de datos.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="p-8 bg-slate-50 rounded-[3rem] border border-slate-100 space-y-6">
+                <div>
+                  <h4 className="text-lg font-black text-slate-800 mb-1">Exportar Sistema</h4>
+                  <p className="text-xs font-medium text-slate-400 leading-relaxed">Generar una copia completa en XML.</p>
+                </div>
+                <button 
+                  onClick={exportToXML}
+                  className="w-full flex items-center justify-center gap-3 bg-slate-900 text-white py-5 rounded-[2rem] font-black uppercase text-[10px] tracking-widest shadow-xl shadow-slate-200 hover:bg-slate-800 transition-all active:scale-95"
+                >
+                  <Archive size={18} /> Descargar Backup XML
+                </button>
+              </div>
+
+              <div className="p-8 bg-sky-50 rounded-[3rem] border border-sky-100 space-y-6">
+                <div>
+                  <h4 className="text-lg font-black text-sky-900 mb-1">Restaurar Datos</h4>
+                  <p className="text-xs font-medium text-sky-700/60 leading-relaxed">Cargar un archivo de salva XML previo.</p>
+                </div>
+                <div className="relative">
+                  <input 
+                    type="file" 
+                    accept=".xml" 
+                    onChange={importFromXML}
+                    ref={fileInputRef}
+                    className="hidden" 
+                    id="xml-restore-btn"
+                  />
+                  <label 
+                    htmlFor="xml-restore-btn"
+                    className="w-full flex items-center justify-center gap-3 bg-sky-500 text-white py-5 rounded-[2rem] font-black uppercase text-[10px] tracking-widest shadow-xl shadow-sky-100 hover:bg-sky-600 cursor-pointer text-center active:scale-95 transition-all"
+                  >
+                    <UploadCloud size={18} /> Subir XML de Salva
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+      default: return renderDashboard();
+    }
   };
 
   const renderCalendar = () => {
@@ -403,7 +518,7 @@ export const AdminView: React.FC = () => {
                 {dayAppointments.length > 0 ? dayAppointments.sort((a,b) => a.startTime.localeCompare(b.startTime)).map(app => (
                   <div key={app.id} className={`p-6 rounded-[2.5rem] border transition-all flex flex-col md:flex-row md:items-center justify-between gap-6
                     ${app.status === 'available' ? 'bg-slate-50/50 border-dashed border-slate-200' : 
-                      app.status === 'rejected' ? 'bg-rose-50/30 border-rose-100 grayscale-[0.3]' : 
+                      app.status === 'rejected' ? 'bg-rose-50/30 border-rose-100' : 
                       app.status === 'completed' ? 'bg-slate-50 border-slate-200 opacity-70' : 'bg-white border-slate-100 shadow-sm ring-1 ring-slate-50'}`}>
                     
                     <div className="flex items-center gap-6">
@@ -415,13 +530,13 @@ export const AdminView: React.FC = () => {
                       </div>
                       <div>
                         {app.status === 'available' ? (
-                          <h4 className="text-sm font-black text-slate-400 uppercase tracking-widest italic">Espacio para Reserva</h4>
+                          <h4 className="text-sm font-black text-slate-400 uppercase tracking-widest italic">Horario Libre</h4>
                         ) : (
                           <div>
                             <h4 className="text-lg font-black text-slate-900 leading-tight flex items-center gap-2">
                               {app.clientName}
-                              {app.status === 'rejected' && <span className="text-[8px] px-2 py-0.5 bg-rose-500 text-white rounded-full">RECHAZADA</span>}
-                              {app.status === 'completed' && <span className="text-[8px] px-2 py-0.5 bg-slate-800 text-white rounded-full">FACTURADA</span>}
+                              {app.status === 'rejected' && <span className="text-[8px] px-2 py-0.5 bg-rose-500 text-white rounded-full uppercase">Rechazada</span>}
+                              {app.status === 'completed' && <span className="text-[8px] px-2 py-0.5 bg-slate-800 text-white rounded-full uppercase">Facturada</span>}
                             </h4>
                             <p className="text-[9px] font-bold text-sky-500 uppercase tracking-widest">
                               {app.reason || 'Consulta General'} {app.paidAmount && `· $${app.paidAmount}`}
@@ -454,48 +569,12 @@ export const AdminView: React.FC = () => {
                 )) : (
                   <div className="py-24 text-center flex flex-col items-center justify-center space-y-4 opacity-20">
                     <CalendarDays size={60} className="text-slate-300" />
-                    <p className="text-xs font-black uppercase tracking-[0.2em]">Agenda Vacía</p>
+                    <p className="text-xs font-black uppercase tracking-[0.2em]">Sin turnos creados</p>
                   </div>
                 )}
               </div>
             </div>
           </div>
-        </div>
-      </div>
-    );
-  };
-
-  const renderEquipo = () => {
-    const admins = allUsers.filter(u => u.role === 'admin');
-
-    return (
-      <div className="space-y-8 animate-in fade-in duration-500">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-6 px-4">
-          <h3 className="text-3xl font-black text-slate-900 tracking-tight">Equipo Administrativo</h3>
-          <button 
-            onClick={() => setShowAdminModal(true)}
-            className="bg-sky-500 text-white px-8 py-5 rounded-[2rem] font-black uppercase text-[10px] tracking-widest shadow-2xl shadow-sky-100 flex items-center gap-3"
-          >
-            <UserPlus size={20} /> Añadir Administrador
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {admins.map((admin) => (
-            <div key={admin.id} className="bg-white p-8 rounded-[3.5rem] border border-slate-100 shadow-sm relative overflow-hidden group">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-slate-50 rounded-full -mr-12 -mt-12 group-hover:bg-sky-500 transition-colors duration-500"></div>
-              <div className="flex flex-col items-center text-center relative z-10">
-                <div className="w-20 h-20 rounded-[2.2rem] bg-slate-50 border border-slate-100 flex items-center justify-center font-black text-slate-400 text-2xl mb-6 group-hover:bg-white group-hover:text-sky-500 transition-all">
-                  {admin.name.charAt(0)}
-                </div>
-                <h4 className="text-lg font-black text-slate-800 leading-tight mb-1">{admin.name}</h4>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-4">{admin.email}</p>
-                <div className="px-4 py-1.5 bg-sky-50 text-sky-600 rounded-full text-[9px] font-black uppercase tracking-widest">
-                  Administrator
-                </div>
-              </div>
-            </div>
-          ))}
         </div>
       </div>
     );
@@ -524,7 +603,22 @@ export const AdminView: React.FC = () => {
 
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
             <div className="lg:col-span-1 space-y-8">
-              <div className="bg-white p-10 rounded-[3.5rem] border border-slate-100 shadow-xl text-center">
+              <div className="bg-white p-10 rounded-[3.5rem] border border-slate-100 shadow-xl text-center relative group">
+                <div className="absolute top-6 right-6 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                   <button 
+                    onClick={() => { setPatientToEdit(patient!); setShowEditPatientModal(true); }}
+                    className="p-3 bg-slate-900 text-white rounded-2xl hover:bg-sky-500 transition-colors"
+                   >
+                    <Edit2 size={16} />
+                   </button>
+                   <button 
+                    onClick={() => handleDeletePatient(patient!.id)}
+                    className="p-3 bg-rose-500 text-white rounded-2xl hover:bg-rose-600 transition-colors"
+                   >
+                    <Trash2 size={16} />
+                   </button>
+                </div>
+                
                 <div className="w-28 h-28 bg-sky-500 text-white rounded-[2.5rem] flex items-center justify-center text-4xl font-black mx-auto mb-6 shadow-2xl shadow-sky-100">
                   {patient?.name.charAt(0)}
                 </div>
@@ -555,7 +649,7 @@ export const AdminView: React.FC = () => {
                 <div className="flex justify-between items-center mb-10">
                   <div className="space-y-1">
                     <h3 className="text-2xl font-black text-slate-900 flex items-center gap-3">
-                      <Stethoscope size={28} className="text-sky-500" /> Dentigrama Clínico
+                      <Stethoscope size={28} className="text-sky-500" /> Odontograma de Evolución
                     </h3>
                   </div>
                 </div>
@@ -575,9 +669,9 @@ export const AdminView: React.FC = () => {
                 />
 
                 <div className="mt-12 p-8 bg-slate-50 rounded-[3rem] border border-slate-200">
-                  <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Notas y Observaciones</h4>
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Evolución y Notas Médicas</h4>
                   <textarea 
-                    placeholder="Escriba aquí la evolución del paciente..."
+                    placeholder="Escriba aquí la evolución del paciente, tratamientos recomendados o alergias importantes..."
                     className="w-full h-40 bg-transparent text-sm font-bold text-slate-800 outline-none resize-none"
                   />
                 </div>
@@ -591,15 +685,15 @@ export const AdminView: React.FC = () => {
     return (
       <div className="space-y-8 animate-in fade-in duration-500">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6 px-4">
-          <h3 className="text-3xl font-black text-slate-900 tracking-tight">Gestión de Pacientes</h3>
+          <h3 className="text-3xl font-black text-slate-900 tracking-tight">Manejo de Pacientes</h3>
           <div className="relative w-full md:w-96">
             <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
             <input 
               type="text" 
-              placeholder="Buscar..." 
+              placeholder="Buscar por nombre o celular..." 
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              className="w-full pl-16 pr-8 py-5 bg-white border border-slate-200 rounded-[2rem] text-sm font-bold shadow-sm" 
+              className="w-full pl-16 pr-8 py-5 bg-white border border-slate-200 rounded-[2rem] text-sm font-bold shadow-sm focus:ring-4 focus:ring-sky-500/5 transition-all" 
             />
           </div>
         </div>
@@ -610,6 +704,23 @@ export const AdminView: React.FC = () => {
                <div className="absolute top-0 right-0 w-24 h-24 bg-sky-50 rounded-full -mr-12 -mt-12 group-hover:bg-sky-500 transition-colors duration-500"></div>
               
               <div className="flex flex-col items-center text-center relative z-10">
+                <div className="absolute top-0 right-0 flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                   <button 
+                    onClick={() => { setPatientToEdit(user); setShowEditPatientModal(true); }}
+                    className="p-2 text-slate-400 hover:text-slate-900 transition-colors"
+                    title="Editar"
+                   >
+                    <Edit2 size={16} />
+                   </button>
+                   <button 
+                    onClick={() => handleDeletePatient(user.id)}
+                    className="p-2 text-slate-400 hover:text-rose-500 transition-colors"
+                    title="Eliminar"
+                   >
+                    <Trash2 size={16} />
+                   </button>
+                </div>
+                
                 <div className="w-20 h-20 rounded-[2.2rem] bg-slate-50 border border-slate-100 flex items-center justify-center font-black text-slate-400 text-2xl mb-6 group-hover:bg-white group-hover:text-sky-500 transition-all duration-500">
                   {user.name.charAt(0)}
                 </div>
@@ -621,7 +732,7 @@ export const AdminView: React.FC = () => {
                   }}
                   className="w-full py-4 bg-slate-50 text-slate-600 rounded-[1.5rem] font-black uppercase text-[9px] tracking-widest flex items-center justify-center gap-2 hover:bg-slate-900 hover:text-white transition-all shadow-sm"
                 >
-                  <FileText size={16} /> Ver Ficha Médica
+                  <FileText size={16} /> Ver Expediente
                 </button>
               </div>
             </div>
@@ -631,101 +742,102 @@ export const AdminView: React.FC = () => {
     );
   };
 
-  const renderActiveModule = () => {
-    switch (activeTab) {
-      case 'Dashboard': return renderDashboard();
-      case 'Calendario': return renderCalendar();
-      case 'Pacientes': return renderPatients();
-      case 'Equipo': return renderEquipo();
-      case 'Analíticas': return (
-         <div className="bg-white p-12 rounded-[4rem] border border-slate-100 shadow-sm text-center py-32">
-          <BarChart size={64} className="mx-auto text-slate-200 mb-6" />
-          <h3 className="text-2xl font-black text-slate-900 mb-2">Panel de Analíticas</h3>
-          <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest">Visualización de datos avanzados</p>
+  const renderEquipo = () => {
+    const admins = allUsers.filter(u => u.role === 'admin');
+
+    return (
+      <div className="space-y-8 animate-in fade-in duration-500">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-6 px-4">
+          <h3 className="text-3xl font-black text-slate-900 tracking-tight">Personal Administrativo</h3>
+          <button 
+            onClick={() => setShowAdminModal(true)}
+            className="bg-sky-500 text-white px-8 py-5 rounded-[2rem] font-black uppercase text-[10px] tracking-widest shadow-2xl shadow-sky-100 flex items-center gap-3"
+          >
+            <UserPlus size={20} /> Nuevo Administrador
+          </button>
         </div>
-      );
-      case 'Ajustes': return (
-        <div className="max-w-4xl mx-auto space-y-10 animate-in fade-in duration-500">
-          <div className="bg-white p-12 rounded-[4rem] border border-slate-100 shadow-sm space-y-10">
-            <h3 className="text-2xl font-black text-slate-900 flex items-center gap-3">
-              <Settings className="text-sky-500" size={28} /> Configuración del Centro
-            </h3>
-            <div className="grid grid-cols-2 gap-8">
-              <div className="space-y-4">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Inicio Jornada</label>
-                <input type="time" value={availability.startHour} onChange={e => setAvailability({...availability, startHour: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-3xl p-5 font-black" />
-              </div>
-              <div className="space-y-4">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Fin Jornada</label>
-                <input type="time" value={availability.endHour} onChange={e => setAvailability({...availability, endHour: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-3xl p-5 font-black" />
-              </div>
-            </div>
-          </div>
 
-          <div className="bg-white p-12 rounded-[4rem] border border-slate-100 shadow-sm space-y-10">
-            <div className="flex items-center justify-between">
-              <h3 className="text-2xl font-black text-slate-900 flex items-center gap-3">
-                <Database className="text-emerald-500" size={28} /> Mantenimiento de Datos
-              </h3>
-              <div className="flex items-center gap-2 bg-slate-50 px-4 py-2 rounded-2xl border border-slate-100">
-                <Info size={14} className="text-slate-400" />
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Formato XML Soportado</span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="p-8 bg-slate-50 rounded-[3rem] border border-slate-100 space-y-6">
-                <div>
-                  <h4 className="text-lg font-black text-slate-800 mb-1">Copia de Seguridad</h4>
-                  <p className="text-xs font-medium text-slate-400 leading-relaxed">Exporta todos los pacientes, citas y registros contables a un archivo XML seguro.</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {admins.map((admin) => (
+            <div key={admin.id} className="bg-white p-8 rounded-[3.5rem] border border-slate-100 shadow-sm relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-slate-50 rounded-full -mr-12 -mt-12 group-hover:bg-sky-500 transition-colors duration-500"></div>
+              <div className="flex flex-col items-center text-center relative z-10">
+                <div className="w-20 h-20 rounded-[2.2rem] bg-slate-50 border border-slate-100 flex items-center justify-center font-black text-slate-400 text-2xl mb-6 group-hover:bg-white group-hover:text-sky-500 transition-all">
+                  {admin.name.charAt(0)}
                 </div>
-                <button 
-                  onClick={exportToXML}
-                  className="w-full flex items-center justify-center gap-3 bg-slate-900 text-white py-5 rounded-[2rem] font-black uppercase text-[10px] tracking-widest shadow-xl shadow-slate-200 hover:bg-slate-800 active:scale-95 transition-all"
-                >
-                  <Save size={18} /> Generar Backup XML
-                </button>
-              </div>
-
-              <div className="p-8 bg-sky-50 rounded-[3rem] border border-sky-100 space-y-6">
-                <div>
-                  <h4 className="text-lg font-black text-sky-900 mb-1">Restauración</h4>
-                  <p className="text-xs font-medium text-sky-700/60 leading-relaxed">Carga un archivo de respaldo previo para restaurar el estado del sistema.</p>
-                </div>
-                <div className="relative">
-                  <input 
-                    type="file" 
-                    accept=".xml" 
-                    onChange={importFromXML}
-                    ref={fileInputRef}
-                    className="hidden" 
-                    id="xml-upload"
-                  />
-                  <label 
-                    htmlFor="xml-upload"
-                    className="w-full flex items-center justify-center gap-3 bg-sky-500 text-white py-5 rounded-[2rem] font-black uppercase text-[10px] tracking-widest shadow-xl shadow-sky-100 hover:bg-sky-600 active:scale-95 transition-all cursor-pointer"
-                  >
-                    <UploadCloud size={18} /> Importar y Restaurar
-                  </label>
+                <h4 className="text-lg font-black text-slate-800 leading-tight mb-1">{admin.name}</h4>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-4">{admin.email}</p>
+                <div className="px-4 py-1.5 bg-sky-50 text-sky-600 rounded-full text-[9px] font-black uppercase tracking-widest">
+                  Administrator
                 </div>
               </div>
             </div>
-          </div>
+          ))}
         </div>
-      );
-      default: return renderDashboard();
-    }
+      </div>
+    );
   };
 
   return (
     <div className="pb-32 min-h-screen">
       {renderActiveModule()}
 
+      {/* Modal Edición de Paciente */}
+      {showEditPatientModal && patientToEdit && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[200] flex items-center justify-center p-6">
+          <div className="bg-white w-full max-w-md rounded-[3.5rem] p-12 shadow-2xl animate-in zoom-in-95">
+             <div className="flex justify-between items-center mb-10">
+              <h3 className="text-2xl font-black text-slate-900">Editar Paciente</h3>
+              <button onClick={() => setShowEditPatientModal(false)} className="text-slate-400 hover:text-slate-900"><X size={24}/></button>
+            </div>
+            <form onSubmit={handleUpdatePatient} className="space-y-6">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nombre Completo</label>
+                <input 
+                  required
+                  type="text" 
+                  value={patientToEdit.name}
+                  onChange={e => setPatientToEdit({...patientToEdit, name: e.target.value})}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 font-bold text-slate-800 focus:outline-none focus:ring-4 focus:ring-sky-500/10"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Correo Electrónico</label>
+                <input 
+                  required
+                  type="email" 
+                  value={patientToEdit.email}
+                  onChange={e => setPatientToEdit({...patientToEdit, email: e.target.value})}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 font-bold text-slate-800 focus:outline-none focus:ring-4 focus:ring-sky-500/10"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Teléfono Móvil</label>
+                <input 
+                  required
+                  type="tel" 
+                  value={patientToEdit.phone}
+                  onChange={e => setPatientToEdit({...patientToEdit, phone: e.target.value})}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 font-bold text-slate-800 focus:outline-none focus:ring-4 focus:ring-sky-500/10"
+                />
+              </div>
+              <button 
+                type="submit"
+                className="w-full py-5 bg-slate-900 text-white rounded-[1.8rem] font-black uppercase text-[10px] tracking-widest mt-4 shadow-xl shadow-slate-200 hover:bg-slate-800 transition-all active:scale-95"
+              >
+                Actualizar Información
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Botón flotante para abrir horarios */}
       <button 
         onClick={() => setShowSlotModal(true)}
-        className="fixed bottom-12 right-12 w-24 h-24 bg-sky-500 text-white rounded-[3rem] shadow-2xl flex items-center justify-center z-[80] border-[8px] border-white hover:bg-sky-600 active:scale-90 transition-all group"
+        className="fixed bottom-12 right-12 w-20 h-20 bg-sky-500 text-white rounded-[2.5rem] shadow-2xl flex items-center justify-center z-[80] border-[6px] border-white hover:bg-sky-600 active:scale-90 transition-all group"
       >
-        <Plus size={32} className="group-hover:rotate-90 transition-transform" />
+        <Plus size={28} className="group-hover:rotate-90 transition-transform" />
       </button>
 
       {/* Modal de Facturación */}
@@ -736,15 +848,15 @@ export const AdminView: React.FC = () => {
               <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-[2.5rem] flex items-center justify-center mx-auto mb-6 shadow-xl shadow-emerald-50">
                 <Receipt size={32} />
               </div>
-              <h3 className="text-2xl font-black text-slate-900">Cerrar y Facturar</h3>
+              <h3 className="text-2xl font-black text-slate-900">Finalizar Tratamiento</h3>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">Cita de {billingAppointment.clientName}</p>
             </div>
 
             <form onSubmit={handleFinalizeBilling} className="space-y-8">
               <div className="space-y-4">
                 <div className="flex justify-between items-center px-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Monto Final Cobrado</label>
-                  <span className="text-[10px] font-black text-sky-500 uppercase tracking-widest">Sugerido: ${treatments.find(t => t.id === billingAppointment.treatmentId)?.price || 0}</span>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Importe Total Cobrado</label>
+                  <span className="text-[10px] font-black text-sky-500 uppercase tracking-widest font-bold">Base: ${treatments.find(t => t.id === billingAppointment.treatmentId)?.price || 0}</span>
                 </div>
                 <div className="relative">
                   <DollarSign className="absolute left-8 top-1/2 -translate-y-1/2 text-slate-300" size={24} />
@@ -760,13 +872,13 @@ export const AdminView: React.FC = () => {
               </div>
 
               <div className="p-6 bg-slate-50 rounded-[2rem] border border-slate-100 space-y-3">
-                <div className="flex justify-between text-[11px] font-bold text-slate-500">
-                  <span>Tratamiento</span>
-                  <span>{treatments.find(t => t.id === billingAppointment.treatmentId)?.name || 'Consulta General'}</span>
+                <div className="flex justify-between text-[11px] font-bold text-slate-500 uppercase">
+                  <span>Procedimiento</span>
+                  <span className="text-slate-900">{treatments.find(t => t.id === billingAppointment.treatmentId)?.name || 'Consulta General'}</span>
                 </div>
-                <div className="flex justify-between text-[11px] font-bold text-slate-500">
-                  <span>Fecha</span>
-                  <span>{billingAppointment.date}</span>
+                <div className="flex justify-between text-[11px] font-bold text-slate-500 uppercase">
+                  <span>Fecha Cita</span>
+                  <span className="text-slate-900">{billingAppointment.date}</span>
                 </div>
               </div>
 
@@ -794,14 +906,14 @@ export const AdminView: React.FC = () => {
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[100] flex items-center justify-center p-6">
           <div className="bg-white w-full max-w-lg rounded-[4rem] p-12 shadow-2xl animate-in zoom-in-95">
             <div className="flex justify-between items-center mb-10">
-              <h3 className="text-3xl font-black text-slate-900">Nuevo Admin</h3>
+              <h3 className="text-3xl font-black text-slate-900">Registrar Admin</h3>
               <button onClick={() => setShowAdminModal(false)}><X size={24}/></button>
             </div>
             <form onSubmit={createAdmin} className="space-y-6">
-              <input required type="text" value={newAdminData.name} onChange={e => setNewAdminData({...newAdminData, name: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-[2rem] px-8 py-5 font-bold" placeholder="Nombre" />
-              <input required type="email" value={newAdminData.email} onChange={e => setNewAdminData({...newAdminData, email: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-[2rem] px-8 py-5 font-bold" placeholder="Email" />
-              <input required type="password" value={newAdminData.password} onChange={e => setNewAdminData({...newAdminData, password: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-[2rem] px-8 py-5 font-bold" placeholder="Contraseña" />
-              <button type="submit" className="w-full py-6 bg-slate-900 text-white rounded-[2.5rem] font-black uppercase tracking-widest mt-4">Guardar</button>
+              <input required type="text" value={newAdminData.name} onChange={e => setNewAdminData({...newAdminData, name: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-[2rem] px-8 py-5 font-bold" placeholder="Nombre completo" />
+              <input required type="email" value={newAdminData.email} onChange={e => setNewAdminData({...newAdminData, email: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-[2rem] px-8 py-5 font-bold" placeholder="Correo electrónico" />
+              <input required type="password" value={newAdminData.password} onChange={e => setNewAdminData({...newAdminData, password: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-[2rem] px-8 py-5 font-bold" placeholder="Contraseña de acceso" />
+              <button type="submit" className="w-full py-6 bg-slate-900 text-white rounded-[2.5rem] font-black uppercase tracking-widest mt-4">Guardar Administrador</button>
             </form>
           </div>
         </div>
@@ -811,25 +923,25 @@ export const AdminView: React.FC = () => {
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[100] flex items-center justify-center p-6">
           <div className="bg-white w-full max-w-lg rounded-[4rem] p-12 shadow-2xl animate-in zoom-in-95">
             <div className="flex justify-between items-center mb-10">
-              <h3 className="text-3xl font-black text-slate-900 leading-tight">Abrir Turno</h3>
+              <h3 className="text-3xl font-black text-slate-900 leading-tight">Habilitar Turno</h3>
               <button onClick={() => setShowSlotModal(false)}><X size={24}/></button>
             </div>
             <form onSubmit={createSlot} className="space-y-8">
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Fecha</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Seleccionar Fecha</label>
                 <input required type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} min={todayStr} className="w-full bg-slate-50 border border-slate-200 rounded-[2rem] px-8 py-5 font-black text-lg" />
               </div>
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Inicio</label>
-                  <input required type="time" value={slotStart} onChange={e => setSlotStart(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-[2rem] px-8 py-5 font-black text-lg" />
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Hora Inicio</label>
+                  <input required type="time" value={slotStart} onChange={e => setSlotStart(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 font-bold text-lg" />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Fin</label>
-                  <input required type="time" value={slotEnd} onChange={e => setSlotEnd(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-[2rem] px-8 py-5 font-black text-lg" />
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Hora Fin</label>
+                  <input required type="time" value={slotEnd} onChange={e => setSlotEnd(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 font-bold text-lg" />
                 </div>
               </div>
-              <button type="submit" className="w-full py-6 bg-slate-900 text-white rounded-[2.5rem] font-black uppercase tracking-widest shadow-2xl mt-4 active:scale-95 transition-all">Habilitar Horario</button>
+              <button type="submit" className="w-full py-6 bg-slate-900 text-white rounded-[2.5rem] font-black uppercase tracking-widest shadow-2xl mt-4 active:scale-95 transition-all">Crear Espacio de Reserva</button>
             </form>
           </div>
         </div>

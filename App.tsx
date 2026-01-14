@@ -185,7 +185,7 @@ const AuthScreen: React.FC = () => {
           </form>
 
           <p className="mt-10 text-center text-[10px] text-slate-300 font-bold uppercase tracking-widest">
-            Care for your smile © 2026
+            Desarrollado por <a href="mailto:appscuba@gmail.com" className="hover:text-sky-500 transition-colors">PedritoTech</a>
           </p>
         </div>
       </div>
