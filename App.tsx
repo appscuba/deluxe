@@ -1,11 +1,11 @@
 
 import React, { useState } from 'react';
-import { AppProvider, useAppContext } from './context/AppContext';
-import { Layout } from './components/Layout';
-import { ClientView } from './components/ClientView';
-import { AdminView } from './components/AdminView';
+import { AppProvider, useAppContext } from './context/AppContext.tsx';
+import { Layout } from './components/Layout.tsx';
+import { ClientView } from './components/ClientView.tsx';
+import { AdminView } from './components/AdminView.tsx';
 import { PlusCircle, User as UserIcon, Lock, Mail, Phone, ArrowRight, AlertCircle } from 'lucide-react';
-import { User } from './types';
+import { User } from './types.ts';
 
 const AuthScreen: React.FC = () => {
   const { setCurrentUser, allUsers, setAllUsers } = useAppContext();
@@ -26,7 +26,6 @@ const AuthScreen: React.FC = () => {
     const DEFAULT_ADMIN_PASS = 'Asd9310*';
 
     if (authMode === 'login') {
-      // 1. Check Root Admin
       if (formData.email === DEFAULT_ADMIN_EMAIL) {
         if (formData.password === DEFAULT_ADMIN_PASS) {
           setCurrentUser({
@@ -44,16 +43,12 @@ const AuthScreen: React.FC = () => {
         }
       }
 
-      // 2. Check existing users (patients or other admins)
       const existingUser = allUsers.find(u => u.email === formData.email);
       if (existingUser) {
-        // In this demo, we assume any password works for non-root users, 
-        // but normally we would verify against a hash.
         setCurrentUser(existingUser);
         return;
       }
 
-      // 3. Auto-register unknown emails as patients for better UX in demo
       if (formData.email.length > 0) {
         const newUser: User = {
           id: Math.random().toString(36).substr(2, 9),
@@ -67,7 +62,6 @@ const AuthScreen: React.FC = () => {
         setCurrentUser(newUser);
       }
     } else {
-      // Registration flow (always defaults to patient role)
       const emailExists = allUsers.some(u => u.email === formData.email) || formData.email === DEFAULT_ADMIN_EMAIL;
       if (emailExists) {
         setError('Este correo ya está registrado. Por favor inicia sesión.');
@@ -196,7 +190,7 @@ const AuthScreen: React.FC = () => {
           </form>
 
           <p className="mt-8 text-center text-[10px] text-slate-400 font-bold leading-relaxed uppercase tracking-widest">
-            Deluxe Dental Care © 2024
+            Deluxe Dental Care © 2026
           </p>
         </div>
       </div>

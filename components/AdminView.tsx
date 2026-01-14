@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
-import { useAppContext } from '../context/AppContext';
-import { Appointment, Treatment, User } from '../types';
+import { useAppContext } from '../context/AppContext.tsx';
+import { Appointment, Treatment, User } from '../types.ts';
 import { 
   BarChart, 
   Bar, 
@@ -125,13 +125,11 @@ export const AdminView: React.FC = () => {
 
   return (
     <div className="pb-24 space-y-6 animate-in fade-in duration-500">
-      {/* Header */}
       <div className="flex flex-col space-y-2">
         <h2 className="text-2xl font-black text-slate-900 tracking-tight">Admin Console</h2>
         <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Deluxe Dental Care Management</p>
       </div>
 
-      {/* Main Stats Tiles */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="bg-sky-500 p-5 rounded-[2.5rem] text-white shadow-xl shadow-sky-100">
           <DollarSign size={24} className="mb-4 opacity-50" />
@@ -155,48 +153,26 @@ export const AdminView: React.FC = () => {
         </div>
       </div>
 
-      {/* Tab Switcher */}
       <div className="flex bg-slate-200/50 p-1.5 rounded-3xl backdrop-blur-sm sticky top-0 z-30">
-        <button 
-          onClick={() => setActiveTab('daily')}
-          className={`flex-1 py-3 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === 'daily' ? 'bg-white text-slate-900 shadow-lg' : 'text-slate-400'}`}
-        >
-          Agenda
-        </button>
-        <button 
-          onClick={() => setActiveTab('stats')}
-          className={`flex-1 py-3 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === 'stats' ? 'bg-white text-slate-900 shadow-lg' : 'text-slate-400'}`}
-        >
-          Finanzas
-        </button>
-        <button 
-          onClick={() => setActiveTab('users')}
-          className={`flex-1 py-3 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === 'users' ? 'bg-white text-slate-900 shadow-lg' : 'text-slate-400'}`}
-        >
-          Usuarios
-        </button>
+        <button onClick={() => setActiveTab('daily')} className={`flex-1 py-3 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === 'daily' ? 'bg-white text-slate-900 shadow-lg' : 'text-slate-400'}`}>Agenda</button>
+        <button onClick={() => setActiveTab('stats')} className={`flex-1 py-3 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === 'stats' ? 'bg-white text-slate-900 shadow-lg' : 'text-slate-400'}`}>Finanzas</button>
+        <button onClick={() => setActiveTab('users')} className={`flex-1 py-3 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === 'users' ? 'bg-white text-slate-900 shadow-lg' : 'text-slate-400'}`}>Usuarios</button>
       </div>
 
       {activeTab === 'daily' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between px-2">
             <h3 className="font-black text-slate-900 text-lg">Citas de Hoy</h3>
-            <button onClick={() => setFilter(filter === 'all' ? 'pending' : 'all')} className="text-[10px] font-black uppercase text-sky-500">
-              {filter === 'all' ? 'Solo Pendientes' : 'Ver Todas'}
-            </button>
+            <button onClick={() => setFilter(filter === 'all' ? 'pending' : 'all')} className="text-[10px] font-black uppercase text-sky-500">{filter === 'all' ? 'Solo Pendientes' : 'Ver Todas'}</button>
           </div>
           <div className="space-y-3">
             {filteredAppointments.length > 0 ? filteredAppointments.map((app) => (
               <div key={app.id} className="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm flex items-center justify-between transition-all hover:border-sky-200">
                 <div className="flex items-center space-x-4">
-                  <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center font-black text-sky-500 border border-slate-100 shadow-inner">
-                    {app.clientName.charAt(0)}
-                  </div>
+                  <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center font-black text-sky-500 border border-slate-100 shadow-inner">{app.clientName.charAt(0)}</div>
                   <div>
                     <h4 className="text-sm font-black text-slate-800 leading-tight">{app.clientName}</h4>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">
-                      {treatments.find(t => t.id === app.treatmentId)?.name} • {app.startTime}
-                    </p>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">{treatments.find(t => t.id === app.treatmentId)?.name} • {app.startTime}</p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -208,9 +184,7 @@ export const AdminView: React.FC = () => {
                   ) : app.status === 'approved' ? (
                     <button onClick={() => updateStatus(app.id, 'completed')} className="px-4 py-2 bg-sky-50 text-sky-600 rounded-2xl text-[10px] font-black uppercase">Finalizar</button>
                   ) : (
-                    <span className={`px-4 py-2 rounded-2xl text-[10px] font-black uppercase ${app.status === 'completed' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                      {app.status}
-                    </span>
+                    <span className={`px-4 py-2 rounded-2xl text-[10px] font-black uppercase ${app.status === 'completed' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>{app.status}</span>
                   )}
                 </div>
               </div>
@@ -226,9 +200,7 @@ export const AdminView: React.FC = () => {
             <div className="h-56 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={earningsChartData}>
-                  <defs>
-                    <linearGradient id="colorEarnings" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.2}/><stop offset="95%" stopColor="#0ea5e9" stopOpacity={0}/></linearGradient>
-                  </defs>
+                  <defs><linearGradient id="colorEarnings" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.2}/><stop offset="95%" stopColor="#0ea5e9" stopOpacity={0}/></linearGradient></defs>
                   <Tooltip contentStyle={{borderRadius: '24px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)'}} />
                   <Area type="monotone" dataKey="earnings" stroke="#0ea5e9" strokeWidth={4} fillOpacity={1} fill="url(#colorEarnings)" />
                 </AreaChart>
@@ -242,95 +214,26 @@ export const AdminView: React.FC = () => {
         <div className="space-y-4">
           <div className="flex items-center justify-between px-2">
             <h3 className="font-black text-slate-900 text-lg">Base de Usuarios</h3>
-            <button 
-              onClick={() => setShowUserModal(true)}
-              className="p-3 bg-sky-500 text-white rounded-2xl shadow-xl shadow-sky-100 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest"
-            >
-              <UserPlus size={16} />
-              Crear
-            </button>
+            <button onClick={() => setShowUserModal(true)} className="p-3 bg-sky-500 text-white rounded-2xl shadow-xl shadow-sky-100 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest"><UserPlus size={16} />Crear</button>
           </div>
           <div className="space-y-3">
             {allUsers.length > 0 ? allUsers.map((user) => (
               <div key={user.id} className="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm flex items-center justify-between">
                 <div className="flex items-center space-x-4">
-                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black border border-slate-100 ${user.role === 'admin' ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-400'}`}>
-                    {user.name.charAt(0)}
-                  </div>
+                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black border border-slate-100 ${user.role === 'admin' ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-400'}`}>{user.name.charAt(0)}</div>
                   <div>
                     <h4 className="text-sm font-black text-slate-800 leading-tight">{user.name}</h4>
                     <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">{user.role} • {user.email}</p>
                   </div>
                 </div>
-                <button onClick={() => deleteUser(user.id)} className="p-2.5 bg-slate-50 text-slate-300 hover:text-rose-500 rounded-2xl transition-colors">
-                  <Trash2 size={18} />
-                </button>
+                <button onClick={() => deleteUser(user.id)} className="p-2.5 bg-slate-50 text-slate-300 hover:text-rose-500 rounded-2xl transition-colors"><Trash2 size={18} /></button>
               </div>
             )) : <div className="py-20 text-center text-slate-300 font-bold uppercase text-[10px] tracking-widest italic">Sin usuarios</div>}
           </div>
         </div>
       )}
-      
-      {/* Floating Action Buttons */}
-      <button 
-        onClick={() => setShowManualBooking(true)}
-        className="fixed bottom-8 right-8 w-16 h-16 bg-sky-500 text-white rounded-[2rem] shadow-2xl shadow-sky-200 flex items-center justify-center active:scale-95 transition-all z-40 border-4 border-white"
-      >
-        <PhoneCall size={24} />
-      </button>
 
-      {/* Manual Booking Modal */}
-      {showManualBooking && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xl z-[100] flex items-end sm:items-center justify-center p-4">
-          <div className="bg-white w-full max-w-lg rounded-[3rem] p-10 shadow-2xl animate-in slide-in-from-bottom duration-500">
-            <div className="flex justify-between items-center mb-8">
-              <h3 className="text-2xl font-black text-slate-900">Reserva Manual</h3>
-              <button onClick={() => setShowManualBooking(false)} className="text-slate-300 p-2"><XCircle size={32} /></button>
-            </div>
-            <div className="space-y-5">
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Paciente</label>
-                <input type="text" placeholder="Nombre completo" className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-slate-800 font-bold" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Día</label><input type="date" className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-slate-800 font-bold" /></div>
-                <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Hora</label><input type="time" className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-slate-800 font-bold" /></div>
-              </div>
-              <button onClick={() => setShowManualBooking(false)} className="w-full bg-sky-500 text-white py-5 rounded-[2rem] font-black text-lg shadow-2xl shadow-sky-100 mt-6">Guardar Cita</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Create User Modal */}
-      {showUserModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xl z-[100] flex items-end sm:items-center justify-center p-4">
-          <div className="bg-white w-full max-w-lg rounded-[3rem] p-10 shadow-2xl animate-in slide-in-from-bottom duration-500">
-            <div className="flex justify-between items-center mb-8">
-              <h3 className="text-2xl font-black text-slate-900">Crear Usuario</h3>
-              <button onClick={() => setShowUserModal(false)} className="text-slate-300 p-2"><XCircle size={32} /></button>
-            </div>
-            <form onSubmit={handleCreateUser} className="space-y-5">
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nombre</label>
-                <input required value={newUserForm.name} onChange={e => setNewUserForm({...newUserForm, name: e.target.value})} type="text" placeholder="Nombre completo" className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-slate-800 font-bold" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email</label>
-                <input required value={newUserForm.email} onChange={e => setNewUserForm({...newUserForm, email: e.target.value})} type="email" placeholder="usuario@clinica.com" className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-slate-800 font-bold" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Rol</label>
-                <select value={newUserForm.role} onChange={e => setNewUserForm({...newUserForm, role: e.target.value as any})} className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-slate-800 font-bold appearance-none">
-                  <option value="client">Paciente</option>
-                  <option value="admin">Administrador</option>
-                </select>
-              </div>
-              <button type="submit" className="w-full bg-sky-500 text-white py-5 rounded-[2rem] font-black text-lg shadow-2xl shadow-sky-100 mt-6">Confirmar Usuario</button>
-            </form>
-          </div>
-        </div>
-      )}
+      <button onClick={() => setShowManualBooking(true)} className="fixed bottom-8 right-8 w-16 h-16 bg-sky-500 text-white rounded-[2rem] shadow-2xl shadow-sky-200 flex items-center justify-center active:scale-95 transition-all z-40 border-4 border-white"><PhoneCall size={24} /></button>
     </div>
   );
 };
