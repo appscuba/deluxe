@@ -11,7 +11,7 @@ export interface User {
   createdAt: string;
 }
 
-export type AppointmentStatus = 'pending' | 'approved' | 'rejected' | 'rescheduled' | 'completed' | 'cancelled';
+export type AppointmentStatus = 'available' | 'pending' | 'approved' | 'rejected' | 'rescheduled' | 'completed' | 'cancelled';
 export type UrgencyLevel = 'low' | 'medium' | 'high';
 
 export interface Treatment {
@@ -24,19 +24,21 @@ export interface Treatment {
 
 export interface Appointment {
   id: string;
-  clientId: string;
-  clientName: string;
-  treatmentId: string;
+  clientId?: string; // Optional if it's an available slot
+  clientName?: string;
+  treatmentId?: string; // Optional for generic slots
   date: string; // ISO string YYYY-MM-DD
   startTime: string; // HH:mm
   endTime: string; // HH:mm
   status: AppointmentStatus;
-  urgency: UrgencyLevel;
-  reason: string;
+  urgency?: UrgencyLevel;
+  reason?: string;
+  symptoms?: string[]; // New: Client reported symptoms
+  improvements?: string[]; // New: Client desired improvements
   notes?: string;
   createdAt: string;
-  isManualBooking?: boolean; // If admin booked via phone
-  paidAmount?: number; // Realized profit
+  isManualBooking?: boolean;
+  paidAmount?: number;
 }
 
 export interface Notification {
