@@ -2,6 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Appointment, UrgencyLevel } from '../types';
+import { canPatientManageAppointment } from '../utils/helpers';
 import { 
   Plus, 
   Calendar as CalendarIcon, 
@@ -13,7 +14,9 @@ import {
   Stethoscope,
   Sparkles,
   Search,
-  CheckCircle2
+  CheckCircle2,
+  Trash2,
+  Info
 } from 'lucide-react';
 
 const SYMPTOMS = [
@@ -44,7 +47,6 @@ export const ClientView: React.FC = () => {
 
   const todayStr = new Date().toISOString().split('T')[0];
 
-  // Available slots created by admin
   const availableSlots = useMemo(() => {
     return appointments.filter(a => a.status === 'available' && a.date >= todayStr)
       .sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
@@ -80,9 +82,26 @@ export const ClientView: React.FC = () => {
       return app;
     }));
 
-    addNotification(currentUser.id, "Cita Solicitada", "Tu solicitud está siendo revisada por el equipo médico.", "status_change");
+    // Notificación al Paciente
+    addNotification(currentUser.id, "Cita Solicitada", `Has solicitado una cita para el ${appointments.find(a => a.id === selectedSlotId)?.date}.`, "status_change");
+    // Notificación al Administrador Global
+    addNotification('admin_root', "Nueva Solicitud", `${currentUser.name} ha solicitado un turno.`, "status_change");
+
     setShowBooking(false);
     resetForm();
+  };
+
+  const handleCancelAppointment = (app: Appointment) => {
+    if (!canPatientManageAppointment(app.date, app.startTime)) {
+      alert("Lo sentimos, las citas solo pueden cancelarse o modificarse con 48 horas de antelación. Por favor, llámenos directamente para casos urgentes.");
+      return;
+    }
+
+    if (confirm("¿Estás seguro de que deseas cancelar esta cita?")) {
+      setAppointments(prev => prev.map(a => a.id === app.id ? { ...a, status: 'available', clientId: undefined, clientName: undefined } : a));
+      addNotification(currentUser!.id, "Cita Cancelada", `Has cancelado tu cita del ${app.date}.`, "status_change");
+      addNotification('admin_root', "Cita Cancelada", `${currentUser?.name} canceló su cita del ${app.date}.`, "status_change");
+    }
   };
 
   const resetForm = () => {
@@ -113,25 +132,44 @@ export const ClientView: React.FC = () => {
             </h3>
             {upcomingApps.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {upcomingApps.map(app => (
-                  <div key={app.id} className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm relative overflow-hidden group hover:shadow-xl hover:shadow-slate-100 transition-all">
-                    <div className={`absolute top-0 right-0 w-2 h-full ${app.status === 'approved' ? 'bg-emerald-500' : 'bg-amber-500'}`}></div>
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{app.date}</p>
-                        <h4 className="font-black text-slate-800 text-lg">{app.startTime} - {app.endTime}</h4>
+                {upcomingApps.map(app => {
+                  const isLocked = !canPatientManageAppointment(app.date, app.startTime);
+                  return (
+                    <div key={app.id} className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm relative overflow-hidden group hover:shadow-xl hover:shadow-slate-100 transition-all">
+                      <div className={`absolute top-0 right-0 w-2 h-full ${app.status === 'approved' ? 'bg-emerald-500' : 'bg-amber-500'}`}></div>
+                      <div className="flex justify-between items-start mb-6">
+                        <div>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{app.date}</p>
+                          <h4 className="font-black text-slate-800 text-lg">{app.startTime} - {app.endTime}</h4>
+                        </div>
+                        <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest ${app.status === 'approved' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+                          {app.status === 'approved' ? 'Confirmada' : 'En espera'}
+                        </span>
                       </div>
-                      <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest ${app.status === 'approved' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
-                        {app.status === 'approved' ? 'Confirmada' : 'En espera'}
-                      </span>
+                      
+                      <div className="flex items-center justify-between">
+                        <div className="flex flex-wrap gap-1.5">
+                          {app.symptoms?.map(s => (
+                            <span key={s} className="bg-slate-50 text-slate-400 px-3 py-1 rounded-lg text-[8px] font-bold uppercase">{s}</span>
+                          ))}
+                        </div>
+                        <button 
+                          onClick={() => handleCancelAppointment(app)}
+                          className={`p-3 rounded-2xl transition-all ${isLocked ? 'text-slate-200 cursor-not-allowed' : 'text-slate-300 hover:text-rose-500 hover:bg-rose-50'}`}
+                          title={isLocked ? "Bloqueado por regla de 48h" : "Cancelar cita"}
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+
+                      {isLocked && (
+                        <div className="mt-4 flex items-center gap-2 text-[8px] font-black text-rose-500 uppercase tracking-widest bg-rose-50 p-2 rounded-xl">
+                          <Clock size={12} /> Cambios solo por teléfono (Regra 48h)
+                        </div>
+                      )}
                     </div>
-                    <div className="flex flex-wrap gap-1.5 mt-2">
-                      {app.symptoms?.map(s => (
-                        <span key={s} className="bg-slate-50 text-slate-400 px-3 py-1 rounded-lg text-[9px] font-bold uppercase">{s}</span>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="bg-white p-20 rounded-[3rem] border-2 border-dashed border-slate-100 text-center space-y-5">
@@ -142,14 +180,15 @@ export const ClientView: React.FC = () => {
           </section>
 
           <section>
-            <h3 className="text-lg font-black text-slate-800 mb-6">Tratamientos Populares</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {treatments.slice(0, 4).map(t => (
-                <div key={t.id} className="bg-white p-6 rounded-[2rem] border border-slate-100 text-center group">
-                  <div className="w-12 h-12 bg-sky-50 text-sky-500 rounded-2xl flex items-center justify-center mx-auto mb-4"><Sparkles size={20} /></div>
-                  <h4 className="font-black text-slate-800 text-[10px] uppercase tracking-widest">{t.name}</h4>
-                </div>
-              ))}
+            <h3 className="text-lg font-black text-slate-800 mb-6">Información Importante</h3>
+            <div className="bg-sky-50 p-8 rounded-[2.5rem] border border-sky-100 flex gap-6 items-start">
+              <div className="bg-white p-3 rounded-2xl text-sky-500 shadow-sm"><Info size={24}/></div>
+              <div>
+                <h4 className="font-black text-sky-900 uppercase text-[10px] tracking-widest mb-2">Política de Cancelación</h4>
+                <p className="text-xs text-sky-700/70 font-bold leading-relaxed">
+                  Para garantizar la atención de todos nuestros pacientes, las citas solo pueden ser canceladas o modificadas a través de la plataforma con al menos **48 horas de antelación**. Si necesita realizar un cambio urgente fuera de este plazo, contáctenos directamente al (00) 0000-0000.
+                </p>
+              </div>
             </div>
           </section>
         </div>
@@ -228,7 +267,7 @@ export const ClientView: React.FC = () => {
                       </button>
                     )) : (
                       <div className="text-center py-20 bg-slate-50 rounded-[3rem] border-2 border-dashed border-slate-100">
-                        <p className="text-[10px] font-black uppercase text-slate-400">No hay turnos disponibles creados por administración</p>
+                        <p className="text-[10px] font-black uppercase text-slate-400">No hay turnos disponibles actualmente</p>
                       </div>
                     )}
                   </div>

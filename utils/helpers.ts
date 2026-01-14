@@ -13,6 +13,17 @@ export const addMinutes = (timeStr: string, minutes: number): string => {
   return formatTime(date);
 };
 
+/**
+ * Verifica si faltan al menos 48 horas para la cita
+ */
+export const canPatientManageAppointment = (date: string, startTime: string): boolean => {
+  const appointmentDate = new Date(`${date}T${startTime}`);
+  const now = new Date();
+  const diffInMs = appointmentDate.getTime() - now.getTime();
+  const diffInHours = diffInMs / (1000 * 60 * 60);
+  return diffInHours >= 48;
+};
+
 export const isTimeSlotAvailable = (
   date: string,
   startTime: string,
@@ -30,7 +41,6 @@ export const isTimeSlotAvailable = (
     const appStart = app.startTime;
     const appEnd = app.endTime;
 
-    // Overlap logic: (start < appEnd) && (end > appStart)
     return (start < appEnd) && (end > appStart);
   });
 };
@@ -49,18 +59,14 @@ export const generateAvailableSlots = (
 
   while (current < endLimit) {
     const nextSlotEnd = addMinutes(current, duration);
-    
     if (nextSlotEnd > endLimit) break;
 
-    // Check lunch break
     const isLunch = availability.lunchStart && availability.lunchEnd && 
                     (current < availability.lunchEnd && nextSlotEnd > availability.lunchStart);
 
     if (!isLunch && isTimeSlotAvailable(date, current, nextSlotEnd, appointments)) {
       slots.push(current);
     }
-
-    // Increments of 15 minutes for flexibility
     current = addMinutes(current, 15);
   }
 

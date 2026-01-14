@@ -13,17 +13,28 @@ import {
   X,
   User as UserIcon,
   BarChart3,
-  ShieldCheck
+  ShieldCheck,
+  CheckCircle2,
+  Clock,
+  XCircle
 } from 'lucide-react';
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUser, setCurrentUser, notifications, activeTab, setActiveTab } = useAppContext();
+  const { currentUser, setCurrentUser, notifications, setNotifications, activeTab, setActiveTab } = useAppContext();
   const [isSidebarOpen, setSidebarOpen] = useState(false);
+  const [isNotifOpen, setNotifOpen] = useState(false);
 
   if (!currentUser) return <>{children}</>;
 
   const isAdmin = currentUser.role === 'admin';
-  const unreadCount = notifications.filter(n => !n.read && n.userId === currentUser.id).length;
+  const myNotifications = notifications.filter(n => n.userId === currentUser.id || (isAdmin && n.userId === 'admin_root'));
+  const unreadCount = myNotifications.filter(n => !n.read).length;
+
+  const markAllAsRead = () => {
+    setNotifications(prev => prev.map(n => 
+      (n.userId === currentUser.id || (isAdmin && n.userId === 'admin_root')) ? { ...n, read: true } : n
+    ));
+  };
 
   const NavItem = ({ icon: Icon, label }: any) => {
     const isActive = activeTab === label;
@@ -115,12 +126,53 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           </button>
 
           <div className="flex-1 flex justify-end items-center space-x-4">
-            <button className="relative p-3 bg-slate-50 text-slate-500 rounded-2xl hover:bg-slate-100 transition-colors">
-              <Bell size={20} />
-              {unreadCount > 0 && (
-                <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white"></span>
+            <div className="relative">
+              <button 
+                onClick={() => {
+                  setNotifOpen(!isNotifOpen);
+                  if (!isNotifOpen) markAllAsRead();
+                }}
+                className={`relative p-3 rounded-2xl transition-colors ${isNotifOpen ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}
+              >
+                <Bell size={20} />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 bg-rose-500 text-white text-[10px] font-black rounded-full border-2 border-white flex items-center justify-center">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {/* Notification Center Popover */}
+              {isNotifOpen && (
+                <div className="absolute right-0 mt-4 w-80 bg-white rounded-[2rem] shadow-2xl border border-slate-100 z-[110] animate-in slide-in-from-top-4 duration-300">
+                  <div className="p-6 border-b border-slate-50 flex justify-between items-center">
+                    <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest">Notificaciones</h4>
+                    <button onClick={() => setNotifOpen(false)} className="text-slate-300 hover:text-slate-900"><X size={16}/></button>
+                  </div>
+                  <div className="max-h-[400px] overflow-y-auto hide-scrollbar p-2">
+                    {myNotifications.length > 0 ? (
+                      myNotifications.map(n => (
+                        <div key={n.id} className={`p-4 rounded-2xl mb-1 transition-colors ${n.read ? 'opacity-60' : 'bg-sky-50/50'}`}>
+                          <div className="flex gap-3">
+                            <div className={`mt-1 w-2 h-2 rounded-full shrink-0 ${n.type === 'status_change' ? 'bg-sky-500' : 'bg-amber-500'}`}></div>
+                            <div>
+                              <p className="text-[11px] font-black text-slate-900 leading-tight">{n.title}</p>
+                              <p className="text-[10px] text-slate-500 mt-1 font-medium">{n.message}</p>
+                              <p className="text-[8px] text-slate-300 font-bold uppercase mt-2">{new Date(n.createdAt).toLocaleTimeString()}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="py-12 text-center text-slate-300">
+                        <Bell size={24} className="mx-auto mb-2 opacity-20" />
+                        <p className="text-[10px] font-black uppercase tracking-widest">Bandeja vacía</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
               )}
-            </button>
+            </div>
             
             <div className="flex items-center space-x-3 bg-slate-50 p-1.5 pr-4 rounded-[1.5rem] border border-slate-100">
                <div className="w-10 h-10 bg-sky-500 text-white rounded-2xl flex items-center justify-center font-black shadow-lg shadow-sky-100">
