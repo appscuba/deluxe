@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
-import { useAppContext } from '../context/AppContext.tsx';
-import { Appointment, Treatment, User } from '../types.ts';
+import { useAppContext } from '../context/AppContext';
+import { Appointment, Treatment, User } from '../types';
 import { 
   BarChart, 
   Bar, 
