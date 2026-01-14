@@ -47,6 +47,7 @@ import { AreaChart, Area, Tooltip, ResponsiveContainer, BarChart as RechartsBar,
 
 export const AdminView: React.FC = () => {
   const { 
+    currentUser,
     appointments, 
     setAppointments, 
     treatments, 
@@ -94,6 +95,7 @@ export const AdminView: React.FC = () => {
   const bookings = useMemo(() => appointments.filter(a => a.status !== 'available'), [appointments]);
 
   const ROOT_ADMIN_EMAIL = 'appscuba@gmail.com';
+  const isSuperAdmin = currentUser?.email === ROOT_ADMIN_EMAIL;
 
   const daysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
   const firstDayOfMonth = (year: number, month: number) => new Date(year, month, 1).getDay();
@@ -203,7 +205,7 @@ export const AdminView: React.FC = () => {
     setAllUsers(prev => prev.map(u => u.id === userToEdit.id ? userToEdit : u));
     setShowEditPatientModal(false);
     setUserToEdit(null);
-    alert('Información actualizada.');
+    alert('Información actualizada correctamente.');
   };
 
   // --- Funciones de Gestión de Citas ---
@@ -642,6 +644,24 @@ export const AdminView: React.FC = () => {
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Teléfono</label>
                 <input required type="tel" value={userToEdit.phone} onChange={e => setUserToEdit({...userToEdit, phone: e.target.value})} className="w-full bg-slate-50 border rounded-2xl px-6 py-4 font-bold" />
               </div>
+
+              {/* Nueva Funcionalidad: Cambio de Contraseña solo para Super Admin */}
+              {isSuperAdmin && (
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-sky-500 uppercase tracking-widest ml-1">Nueva Contraseña (Opcional)</label>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-sky-300" size={18} />
+                    <input 
+                      type="password" 
+                      value={userToEdit.password || ''} 
+                      onChange={e => setUserToEdit({...userToEdit, password: e.target.value})} 
+                      placeholder="Nueva contraseña"
+                      className="w-full bg-sky-50 border border-sky-100 rounded-2xl px-12 py-4 font-bold text-slate-800 placeholder:text-sky-200" 
+                    />
+                  </div>
+                </div>
+              )}
+
               <button type="submit" className="w-full py-5 bg-slate-900 text-white rounded-[1.8rem] font-black uppercase text-[10px] mt-4 shadow-xl">Actualizar Información</button>
             </form>
           </div>
