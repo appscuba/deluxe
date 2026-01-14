@@ -1,7 +1,7 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Appointment, Treatment, User, ToothCondition, ToothState } from '../types';
+import { Appointment, Treatment, User, ToothCondition, ToothState, Notification, PatientRecord, ClinicAvailability } from '../types';
 import { Odontogram } from './Odontogram';
 import { 
   CheckCircle2, 
@@ -32,7 +32,13 @@ import {
   Mail,
   Phone,
   Lock,
-  RefreshCw
+  RefreshCw,
+  Receipt,
+  CreditCard,
+  Database,
+  UploadCloud,
+  Save,
+  Info
 } from 'lucide-react';
 import { AreaChart, Area, Tooltip, ResponsiveContainer, BarChart as RechartsBar, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 
@@ -41,6 +47,9 @@ export const AdminView: React.FC = () => {
     appointments, 
     setAppointments, 
     treatments, 
+    setTreatments,
+    notifications,
+    setNotifications,
     addNotification, 
     allUsers, 
     setAllUsers,
@@ -48,22 +57,31 @@ export const AdminView: React.FC = () => {
     availability,
     setAvailability,
     patientRecords,
+    setPatientRecords,
     updatePatientOdontogram
   } = useAppContext();
 
+  // Modales
   const [showSlotModal, setShowSlotModal] = useState(false);
   const [showAdminModal, setShowAdminModal] = useState(false);
+  const [showBillingModal, setShowBillingModal] = useState(false);
+  
+  // Estados de formulario
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [slotStart, setSlotStart] = useState('09:00');
   const [slotEnd, setSlotEnd] = useState('09:45');
   const [searchTerm, setSearchTerm] = useState('');
-  
   const [newAdminData, setNewAdminData] = useState({ name: '', email: '', password: '' });
+  
+  // Facturación
+  const [billingAppointment, setBillingAppointment] = useState<Appointment | null>(null);
+  const [billingAmount, setBillingAmount] = useState<number>(0);
 
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [viewingPatientFile, setViewingPatientFile] = useState(false);
-
   const [currentMonth, setCurrentMonth] = useState(new Date());
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
   const bookings = useMemo(() => appointments.filter(a => a.status !== 'available'), [appointments]);
@@ -90,7 +108,87 @@ export const AdminView: React.FC = () => {
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + offset, 1));
   };
 
+  // --- Sistema de Respaldo XML ---
+
+  const exportToXML = () => {
+    const data = {
+      users: allUsers,
+      appointments: appointments,
+      treatments: treatments,
+      notifications: notifications,
+      availability: availability,
+      patientRecords: patientRecords,
+      exportDate: new Date().toISOString(),
+      version: "1.0"
+    };
+
+    // Crear estructura XML básica
+    let xmlString = '<?xml version="1.0" encoding="UTF-8"?>\n';
+    xmlString += '<DeluxeDentalBackup>\n';
+    xmlString += `  <Metadata>\n    <Date>${data.exportDate}</Date>\n    <Version>${data.version}</Version>\n  </Metadata>\n`;
+    
+    // Serializar el objeto principal como CDATA para garantizar integridad absoluta
+    xmlString += `  <Payload><![CDATA[${JSON.stringify(data)}]]></Payload>\n`;
+    xmlString += '</DeluxeDentalBackup>';
+
+    const blob = new Blob([xmlString], { type: 'text/xml' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `DeluxeDental_Backup_${new Date().toISOString().split('T')[0]}.xml`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const importFromXML = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const content = event.target?.result as string;
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(content, "text/xml");
+        const payloadNode = xmlDoc.getElementsByTagName("Payload")[0];
+        
+        if (!payloadNode) throw new Error("Archivo XML no válido para Deluxe Dental.");
+
+        const jsonData = JSON.parse(payloadNode.textContent || "");
+        
+        // Restauración de estados
+        if (jsonData.users) setAllUsers(jsonData.users);
+        if (jsonData.appointments) setAppointments(jsonData.appointments);
+        if (jsonData.treatments) setTreatments(jsonData.treatments);
+        if (jsonData.notifications) setNotifications(jsonData.notifications);
+        if (jsonData.availability) setAvailability(jsonData.availability);
+        if (jsonData.patientRecords) setPatientRecords(jsonData.patientRecords);
+
+        alert("¡Sistema restaurado con éxito!");
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      } catch (error) {
+        console.error("Error al importar:", error);
+        alert("Error al procesar el archivo de respaldo. Asegúrate de que es un archivo XML válido generado por esta aplicación.");
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  // --- Funciones de Gestión ---
+
   const updateStatus = (id: string, newStatus: Appointment['status']) => {
+    if (newStatus === 'completed') {
+      const app = appointments.find(a => a.id === id);
+      if (app) {
+        const treatment = treatments.find(t => t.id === app.treatmentId);
+        setBillingAppointment(app);
+        setBillingAmount(treatment?.price || 0);
+        setShowBillingModal(true);
+        return;
+      }
+    }
+
     setAppointments(prev => prev.map(app => {
       if (app.id === id) {
         if (app.clientId) {
@@ -103,6 +201,24 @@ export const AdminView: React.FC = () => {
       }
       return app;
     }));
+  };
+
+  const handleFinalizeBilling = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!billingAppointment) return;
+
+    setAppointments(prev => prev.map(app => {
+      if (app.id === billingAppointment.id) {
+        if (app.clientId) {
+          addNotification(app.clientId, "Tratamiento Finalizado", `Se ha registrado el pago de $${billingAmount}. ¡Gracias por confiar en nosotros!`, 'status_change');
+        }
+        return { ...app, status: 'completed', paidAmount: billingAmount };
+      }
+      return app;
+    }));
+
+    setShowBillingModal(false);
+    setBillingAppointment(null);
   };
 
   const createSlot = (e: React.FormEvent) => {
@@ -148,19 +264,18 @@ export const AdminView: React.FC = () => {
     }
   };
 
+  // --- Renders ---
+
   const renderDashboard = () => {
     const todayCompleted = bookings.filter(a => a.date === todayStr && a.status === 'completed');
-    const earningsToday = todayCompleted.reduce((acc, curr) => {
-      const t = treatments.find(tr => tr.id === curr.treatmentId);
-      return acc + (t?.price || 0);
-    }, 0);
+    const earningsToday = todayCompleted.reduce((acc, curr) => acc + (curr.paidAmount || 0), 0);
 
     return (
       <div className="space-y-8 animate-in fade-in duration-500">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-sky-500 p-6 rounded-[2.5rem] text-white shadow-2xl shadow-sky-100 flex flex-col justify-between h-40">
             <DollarSign size={24} className="opacity-50" />
-            <div><p className="text-[10px] font-black uppercase tracking-widest opacity-80">Ingresos Hoy</p><p className="text-3xl font-black">${earningsToday}</p></div>
+            <div><p className="text-[10px] font-black uppercase tracking-widest opacity-80">Ingresos Hoy (Facturado)</p><p className="text-3xl font-black">${earningsToday}</p></div>
           </div>
           <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col justify-between h-40">
             <Clock size={24} className="text-amber-500 opacity-50" />
@@ -190,13 +305,17 @@ export const AdminView: React.FC = () => {
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{app.date} • {app.startTime}</p>
                   </div>
                 </div>
-                <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest ${
-                  app.status === 'approved' ? 'bg-emerald-50 text-emerald-600' : 
-                  app.status === 'pending' ? 'bg-amber-50 text-amber-600' : 
-                  app.status === 'rejected' ? 'bg-rose-50 text-rose-600' : 'bg-slate-200 text-slate-500'
-                }`}>
-                  {app.status}
-                </span>
+                <div className="flex items-center gap-4">
+                  {app.status === 'completed' && <span className="text-[10px] font-black text-emerald-500 bg-emerald-50 px-3 py-1 rounded-full">+${app.paidAmount || 0}</span>}
+                  <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest ${
+                    app.status === 'approved' ? 'bg-emerald-50 text-emerald-600' : 
+                    app.status === 'pending' ? 'bg-amber-50 text-amber-600' : 
+                    app.status === 'rejected' ? 'bg-rose-50 text-rose-600' : 
+                    app.status === 'completed' ? 'bg-slate-900 text-white' : 'bg-slate-200 text-slate-500'
+                  }`}>
+                    {app.status}
+                  </span>
+                </div>
               </div>
             )) : (
               <p className="text-center py-10 text-slate-300 font-bold uppercase text-[10px]">No hay actividad reciente</p>
@@ -284,12 +403,14 @@ export const AdminView: React.FC = () => {
                 {dayAppointments.length > 0 ? dayAppointments.sort((a,b) => a.startTime.localeCompare(b.startTime)).map(app => (
                   <div key={app.id} className={`p-6 rounded-[2.5rem] border transition-all flex flex-col md:flex-row md:items-center justify-between gap-6
                     ${app.status === 'available' ? 'bg-slate-50/50 border-dashed border-slate-200' : 
-                      app.status === 'rejected' ? 'bg-rose-50/30 border-rose-100 grayscale-[0.3]' : 'bg-white border-slate-100 shadow-sm ring-1 ring-slate-50'}`}>
+                      app.status === 'rejected' ? 'bg-rose-50/30 border-rose-100 grayscale-[0.3]' : 
+                      app.status === 'completed' ? 'bg-slate-50 border-slate-200 opacity-70' : 'bg-white border-slate-100 shadow-sm ring-1 ring-slate-50'}`}>
                     
                     <div className="flex items-center gap-6">
                       <div className={`w-16 h-16 rounded-2xl flex flex-col items-center justify-center font-black shadow-inner
                         ${app.status === 'available' ? 'bg-white text-slate-300' : 
-                          app.status === 'rejected' ? 'bg-rose-100 text-rose-500' : 'bg-sky-500 text-white'}`}>
+                          app.status === 'rejected' ? 'bg-rose-100 text-rose-500' : 
+                          app.status === 'completed' ? 'bg-slate-200 text-slate-500' : 'bg-sky-500 text-white'}`}>
                         <span className="text-sm leading-none">{app.startTime}</span>
                       </div>
                       <div>
@@ -300,8 +421,11 @@ export const AdminView: React.FC = () => {
                             <h4 className="text-lg font-black text-slate-900 leading-tight flex items-center gap-2">
                               {app.clientName}
                               {app.status === 'rejected' && <span className="text-[8px] px-2 py-0.5 bg-rose-500 text-white rounded-full">RECHAZADA</span>}
+                              {app.status === 'completed' && <span className="text-[8px] px-2 py-0.5 bg-slate-800 text-white rounded-full">FACTURADA</span>}
                             </h4>
-                            <p className="text-[9px] font-bold text-sky-500 uppercase tracking-widest">{app.reason || 'Consulta General'}</p>
+                            <p className="text-[9px] font-bold text-sky-500 uppercase tracking-widest">
+                              {app.reason || 'Consulta General'} {app.paidAmount && `· $${app.paidAmount}`}
+                            </p>
                           </div>
                         )}
                       </div>
@@ -315,7 +439,9 @@ export const AdminView: React.FC = () => {
                         </>
                       )}
                       {app.status === 'approved' && (
-                        <button onClick={() => updateStatus(app.id, 'completed')} className="bg-slate-900 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase">Finalizar</button>
+                        <button onClick={() => updateStatus(app.id, 'completed')} className="bg-slate-900 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase flex items-center gap-2">
+                          <Receipt size={14} /> Finalizar y Cobrar
+                        </button>
                       )}
                       {app.status === 'rejected' && (
                         <button onClick={() => updateStatus(app.id, 'approved')} className="bg-sky-500 text-white px-6 py-3 rounded-2xl text-[9px] font-black uppercase flex items-center gap-2 shadow-lg shadow-sky-100">
@@ -519,16 +645,70 @@ export const AdminView: React.FC = () => {
         </div>
       );
       case 'Ajustes': return (
-        <div className="max-w-4xl mx-auto bg-white p-12 rounded-[4rem] border border-slate-100 shadow-sm space-y-10">
-          <h3 className="text-2xl font-black text-slate-900">Configuración del Centro</h3>
-          <div className="grid grid-cols-2 gap-8">
-            <div className="space-y-4">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Inicio Jornada</label>
-              <input type="time" value={availability.startHour} onChange={e => setAvailability({...availability, startHour: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-3xl p-5 font-black" />
+        <div className="max-w-4xl mx-auto space-y-10 animate-in fade-in duration-500">
+          <div className="bg-white p-12 rounded-[4rem] border border-slate-100 shadow-sm space-y-10">
+            <h3 className="text-2xl font-black text-slate-900 flex items-center gap-3">
+              <Settings className="text-sky-500" size={28} /> Configuración del Centro
+            </h3>
+            <div className="grid grid-cols-2 gap-8">
+              <div className="space-y-4">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Inicio Jornada</label>
+                <input type="time" value={availability.startHour} onChange={e => setAvailability({...availability, startHour: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-3xl p-5 font-black" />
+              </div>
+              <div className="space-y-4">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Fin Jornada</label>
+                <input type="time" value={availability.endHour} onChange={e => setAvailability({...availability, endHour: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-3xl p-5 font-black" />
+              </div>
             </div>
-            <div className="space-y-4">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Fin Jornada</label>
-              <input type="time" value={availability.endHour} onChange={e => setAvailability({...availability, endHour: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-3xl p-5 font-black" />
+          </div>
+
+          <div className="bg-white p-12 rounded-[4rem] border border-slate-100 shadow-sm space-y-10">
+            <div className="flex items-center justify-between">
+              <h3 className="text-2xl font-black text-slate-900 flex items-center gap-3">
+                <Database className="text-emerald-500" size={28} /> Mantenimiento de Datos
+              </h3>
+              <div className="flex items-center gap-2 bg-slate-50 px-4 py-2 rounded-2xl border border-slate-100">
+                <Info size={14} className="text-slate-400" />
+                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Formato XML Soportado</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="p-8 bg-slate-50 rounded-[3rem] border border-slate-100 space-y-6">
+                <div>
+                  <h4 className="text-lg font-black text-slate-800 mb-1">Copia de Seguridad</h4>
+                  <p className="text-xs font-medium text-slate-400 leading-relaxed">Exporta todos los pacientes, citas y registros contables a un archivo XML seguro.</p>
+                </div>
+                <button 
+                  onClick={exportToXML}
+                  className="w-full flex items-center justify-center gap-3 bg-slate-900 text-white py-5 rounded-[2rem] font-black uppercase text-[10px] tracking-widest shadow-xl shadow-slate-200 hover:bg-slate-800 active:scale-95 transition-all"
+                >
+                  <Save size={18} /> Generar Backup XML
+                </button>
+              </div>
+
+              <div className="p-8 bg-sky-50 rounded-[3rem] border border-sky-100 space-y-6">
+                <div>
+                  <h4 className="text-lg font-black text-sky-900 mb-1">Restauración</h4>
+                  <p className="text-xs font-medium text-sky-700/60 leading-relaxed">Carga un archivo de respaldo previo para restaurar el estado del sistema.</p>
+                </div>
+                <div className="relative">
+                  <input 
+                    type="file" 
+                    accept=".xml" 
+                    onChange={importFromXML}
+                    ref={fileInputRef}
+                    className="hidden" 
+                    id="xml-upload"
+                  />
+                  <label 
+                    htmlFor="xml-upload"
+                    className="w-full flex items-center justify-center gap-3 bg-sky-500 text-white py-5 rounded-[2rem] font-black uppercase text-[10px] tracking-widest shadow-xl shadow-sky-100 hover:bg-sky-600 active:scale-95 transition-all cursor-pointer"
+                  >
+                    <UploadCloud size={18} /> Importar y Restaurar
+                  </label>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -547,6 +727,68 @@ export const AdminView: React.FC = () => {
       >
         <Plus size={32} className="group-hover:rotate-90 transition-transform" />
       </button>
+
+      {/* Modal de Facturación */}
+      {showBillingModal && billingAppointment && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[200] flex items-center justify-center p-6">
+          <div className="bg-white w-full max-w-md rounded-[4rem] p-12 shadow-2xl animate-in zoom-in-95 duration-300">
+            <div className="text-center mb-10">
+              <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-[2.5rem] flex items-center justify-center mx-auto mb-6 shadow-xl shadow-emerald-50">
+                <Receipt size={32} />
+              </div>
+              <h3 className="text-2xl font-black text-slate-900">Cerrar y Facturar</h3>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">Cita de {billingAppointment.clientName}</p>
+            </div>
+
+            <form onSubmit={handleFinalizeBilling} className="space-y-8">
+              <div className="space-y-4">
+                <div className="flex justify-between items-center px-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Monto Final Cobrado</label>
+                  <span className="text-[10px] font-black text-sky-500 uppercase tracking-widest">Sugerido: ${treatments.find(t => t.id === billingAppointment.treatmentId)?.price || 0}</span>
+                </div>
+                <div className="relative">
+                  <DollarSign className="absolute left-8 top-1/2 -translate-y-1/2 text-slate-300" size={24} />
+                  <input 
+                    required 
+                    type="number" 
+                    value={billingAmount} 
+                    onChange={e => setBillingAmount(Number(e.target.value))}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-[2.5rem] pl-16 pr-8 py-6 font-black text-3xl text-slate-800 focus:outline-none focus:ring-4 focus:ring-sky-500/10 focus:border-sky-500 transition-all"
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+
+              <div className="p-6 bg-slate-50 rounded-[2rem] border border-slate-100 space-y-3">
+                <div className="flex justify-between text-[11px] font-bold text-slate-500">
+                  <span>Tratamiento</span>
+                  <span>{treatments.find(t => t.id === billingAppointment.treatmentId)?.name || 'Consulta General'}</span>
+                </div>
+                <div className="flex justify-between text-[11px] font-bold text-slate-500">
+                  <span>Fecha</span>
+                  <span>{billingAppointment.date}</span>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button 
+                  type="button"
+                  onClick={() => { setShowBillingModal(false); setBillingAppointment(null); }}
+                  className="flex-1 py-5 bg-slate-100 text-slate-500 rounded-[2rem] font-black uppercase text-[10px] tracking-widest hover:bg-slate-200 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit"
+                  className="flex-[2] py-5 bg-slate-900 text-white rounded-[2rem] font-black uppercase text-[10px] tracking-widest shadow-xl shadow-slate-200 hover:bg-slate-800 transition-all flex items-center justify-center gap-2"
+                >
+                  <CreditCard size={16} /> Confirmar Pago
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {showAdminModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[100] flex items-center justify-center p-6">

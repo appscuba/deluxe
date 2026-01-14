@@ -13,12 +13,14 @@ interface AppContextType {
   treatments: Treatment[];
   setTreatments: React.Dispatch<React.SetStateAction<Treatment[]>>;
   notifications: Notification[];
+  setNotifications: React.Dispatch<React.SetStateAction<Notification[]>>;
   addNotification: (userId: string, title: string, message: string, type: Notification['type']) => void;
   availability: ClinicAvailability;
   setAvailability: React.Dispatch<React.SetStateAction<ClinicAvailability>>;
   activeTab: string;
   setActiveTab: (tab: string) => void;
   patientRecords: PatientRecord[];
+  setPatientRecords: React.Dispatch<React.SetStateAction<PatientRecord[]>>;
   updatePatientOdontogram: (patientId: string, odontogram: ToothState[]) => void;
 }
 
@@ -120,10 +122,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       allUsers, setAllUsers,
       appointments, setAppointments,
       treatments, setTreatments,
-      notifications, addNotification,
+      notifications, setNotifications, addNotification,
       availability, setAvailability,
       activeTab, setActiveTab,
-      patientRecords,
+      patientRecords, setPatientRecords,
       updatePatientOdontogram
     }}>
       {children}
