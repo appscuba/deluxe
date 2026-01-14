@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Appointment, User, PatientRecord, ClinicSettings } from '../types';
 import { Odontogram } from './Odontogram';
@@ -43,8 +43,7 @@ export const AdminView: React.FC = () => {
     setClinicSettings,
     patientRecords,
     updatePatientOdontogram,
-    setPatientRecords,
-    setNotifications
+    setPatientRecords
   } = useAppContext();
 
   // Modales
@@ -60,8 +59,14 @@ export const AdminView: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [newAdminData, setNewAdminData] = useState({ name: '', email: '', password: '', phone: '' });
   
-  // Ajustes de Clínica
+  // Ajustes de Clínica (Sincronizado con contexto)
   const [tempSettings, setTempSettings] = useState<ClinicSettings>(clinicSettings);
+
+  useEffect(() => {
+    if (activeTab === 'Ajustes') {
+      setTempSettings(clinicSettings);
+    }
+  }, [activeTab, clinicSettings]);
 
   // Asignación de Cita
   const [appointmentToAssign, setAppointmentToAssign] = useState<Appointment | null>(null);
@@ -110,7 +115,7 @@ export const AdminView: React.FC = () => {
     if (!userToEdit) return;
     setAllUsers(prev => prev.map(u => u.id === userToEdit.id ? userToEdit : u));
     setShowEditUserModal(false);
-    alert('Usuario actualizado con éxito. Las nuevas credenciales ya están activas.');
+    alert('Usuario actualizado con éxito.');
   };
 
   const updateStatus = (id: string, newStatus: Appointment['status']) => {
@@ -151,7 +156,7 @@ export const AdminView: React.FC = () => {
       name: newAdminData.name,
       email: newAdminData.email,
       phone: newAdminData.phone,
-      password: newAdminData.password, // Importante: Se guarda la contraseña
+      password: newAdminData.password,
       role: 'admin',
       createdAt: new Date().toISOString()
     };
@@ -163,17 +168,11 @@ export const AdminView: React.FC = () => {
 
   const saveSettings = () => {
     setClinicSettings(tempSettings);
-    alert("Configuración de la clínica guardada correctamente.");
+    alert("Ajustes de la clínica guardados correctamente.");
   };
 
   const exportData = () => {
-    const data = {
-      allUsers,
-      appointments,
-      clinicSettings,
-      patientRecords,
-      exportDate: new Date().toISOString()
-    };
+    const data = { allUsers, appointments, clinicSettings, patientRecords };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -193,10 +192,8 @@ export const AdminView: React.FC = () => {
         if (data.appointments) setAppointments(data.appointments);
         if (data.clinicSettings) setClinicSettings(data.clinicSettings);
         if (data.patientRecords) setPatientRecords(data.patientRecords);
-        alert("Restauración completada satisfactoriamente.");
-      } catch (err) {
-        alert("Archivo inválido o corrupto.");
-      }
+        alert("Restauración completada.");
+      } catch (err) { alert("Archivo inválido."); }
     };
     reader.readAsText(file);
   };
@@ -206,7 +203,7 @@ export const AdminView: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-sky-500 p-6 rounded-[2.5rem] text-white shadow-xl flex flex-col justify-between h-40">
           <Activity size={24} className="opacity-50" />
-          <div><p className="text-[10px] font-black uppercase tracking-widest opacity-80">Citas Pendientes</p><p className="text-3xl font-black">{bookings.filter(b => b.status === 'pending').length}</p></div>
+          <div><p className="text-[10px] font-black uppercase tracking-widest opacity-80">Pendientes</p><p className="text-3xl font-black">{bookings.filter(b => b.status === 'pending').length}</p></div>
         </div>
         <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col justify-between h-40">
           <CheckCircle2 size={24} className="text-emerald-500 opacity-50" />
@@ -214,11 +211,11 @@ export const AdminView: React.FC = () => {
         </div>
         <div className="bg-slate-900 p-6 rounded-[2.5rem] text-white shadow-xl flex flex-col justify-between h-40">
           <ShieldCheck size={24} className="text-sky-400 opacity-50" />
-          <div><p className="text-[10px] font-black uppercase tracking-widest opacity-80">Equipo</p><p className="text-3xl font-black">{allUsers.filter(u => u.role === 'admin').length + 1}</p></div>
+          <div><p className="text-[10px] font-black uppercase tracking-widest opacity-80">Admin Staff</p><p className="text-3xl font-black">{allUsers.filter(u => u.role === 'admin').length + 1}</p></div>
         </div>
         <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col justify-between h-40">
           <CalendarIcon size={24} className="text-sky-500 opacity-50" />
-          <div><p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Pacientes</p><p className="text-3xl font-black text-slate-800">{allUsers.filter(u => u.role === 'client').length}</p></div>
+          <div><p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Pacientes</p><p className="text-3xl font-black text-slate-800">{allUsers.filter(u => u.role === 'client').length}</p></div>
         </div>
       </div>
     </div>
@@ -254,23 +251,23 @@ export const AdminView: React.FC = () => {
         </div>
 
         <div className="flex-1 bg-white p-8 rounded-[3.5rem] border shadow-sm min-h-[500px]">
-          <h3 className="text-2xl font-black text-slate-900 mb-8 tracking-tight">Citas para el {selectedDate}</h3>
+          <h3 className="text-2xl font-black text-slate-900 mb-8 tracking-tight">Agenda: {selectedDate}</h3>
           <div className="space-y-4">
             {dayAppointments.length > 0 ? dayAppointments.map(app => (
               <div key={app.id} className={`p-6 rounded-[2.5rem] border transition-all flex items-center justify-between ${app.status === 'available' ? 'bg-slate-50/50 border-dashed' : 'bg-white shadow-sm'}`}>
                 <div className="flex items-center gap-6">
                   <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black ${app.status === 'available' ? 'bg-white text-slate-300 border border-slate-100' : 'bg-sky-500 text-white'}`}>{app.startTime}</div>
                   <div>
-                    <h4 className="text-lg font-black text-slate-800">{app.status === 'available' ? 'Espacio Libre' : app.clientName}</h4>
+                    <h4 className="text-lg font-black text-slate-800">{app.status === 'available' ? 'Libre' : app.clientName}</h4>
                     <p className={`text-[10px] font-bold uppercase tracking-widest ${app.status === 'pending' ? 'text-amber-500' : 'text-slate-400'}`}>
-                      {app.status === 'pending' ? 'Solicitud Pendiente' : app.status === 'available' ? 'Disponible para paciente' : 'Cita Confirmada'}
+                      {app.status === 'pending' ? 'Esperando Aprobación' : app.status === 'available' ? 'Listo para agendar' : 'Confirmada'}
                     </p>
                   </div>
                 </div>
                 <div className="flex gap-2">
                   {app.status === 'available' && (
                     <button onClick={() => { setAppointmentToAssign(app); setShowAssignModal(true); }} className="bg-sky-100 text-sky-600 px-6 py-3 rounded-2xl text-[10px] font-black uppercase flex items-center gap-2 hover:bg-sky-500 hover:text-white transition-all">
-                      <UserCheck size={16} /> Asignar
+                      <UserCheck size={16} /> Agendar Paciente
                     </button>
                   )}
                   {app.status === 'pending' && (
@@ -282,7 +279,7 @@ export const AdminView: React.FC = () => {
                   <button onClick={() => { if(confirm('¿Eliminar turno?')) setAppointments(prev => prev.filter(a => a.id !== app.id)) }} className="p-3 text-slate-200 hover:text-rose-500 transition-colors"><Trash2 size={18} /></button>
                 </div>
               </div>
-            )) : <div className="py-24 text-center opacity-20 font-black uppercase text-[10px] tracking-widest">Agenda vacía para hoy</div>}
+            )) : <div className="py-24 text-center opacity-20 font-black uppercase text-[10px] tracking-widest">No hay turnos para este día</div>}
           </div>
         </div>
       </div>
@@ -291,66 +288,37 @@ export const AdminView: React.FC = () => {
 
   const renderAjustes = () => (
     <div className="max-w-4xl mx-auto space-y-12 animate-in slide-in-from-bottom-6 duration-700">
-      {/* Datos de la Clínica */}
       <section className="bg-white p-10 rounded-[3.5rem] border shadow-sm space-y-8">
-        <h3 className="text-2xl font-black text-slate-900 flex items-center gap-3"><Building2 className="text-sky-500" size={28} /> Perfil de Clínica</h3>
+        <h3 className="text-2xl font-black text-slate-900 flex items-center gap-3"><Building2 className="text-sky-500" size={28} /> Información de la Clínica</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-1">
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nombre Comercial</label>
-            <div className="relative">
-              <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-              <input type="text" value={tempSettings.name} onChange={e => setTempSettings({...tempSettings, name: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-12 py-4 font-bold outline-none focus:ring-4 focus:ring-sky-500/10" />
-            </div>
+            <input type="text" value={tempSettings.name} onChange={e => setTempSettings({...tempSettings, name: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 font-bold outline-none focus:ring-4 focus:ring-sky-500/10" />
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Teléfono Público</label>
-            <div className="relative">
-              <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-              <input type="text" value={tempSettings.phone} onChange={e => setTempSettings({...tempSettings, phone: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-12 py-4 font-bold outline-none" />
-            </div>
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Teléfono</label>
+            <input type="text" value={tempSettings.phone} onChange={e => setTempSettings({...tempSettings, phone: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 font-bold outline-none" />
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email de Contacto</label>
-            <div className="relative">
-              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-              <input type="email" value={tempSettings.email} onChange={e => setTempSettings({...tempSettings, email: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-12 py-4 font-bold outline-none" />
-            </div>
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email</label>
+            <input type="email" value={tempSettings.email} onChange={e => setTempSettings({...tempSettings, email: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 font-bold outline-none" />
           </div>
           <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Dirección Física</label>
-            <div className="relative">
-              <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-              <input type="text" value={tempSettings.address} onChange={e => setTempSettings({...tempSettings, address: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-12 py-4 font-bold outline-none" />
-            </div>
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Dirección</label>
+            <input type="text" value={tempSettings.address} onChange={e => setTempSettings({...tempSettings, address: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 font-bold outline-none" />
           </div>
         </div>
-        <button onClick={saveSettings} className="bg-sky-500 text-white px-10 py-5 rounded-[2rem] font-black uppercase text-[10px] flex items-center gap-3 shadow-lg hover:bg-sky-600 transition-all"><Save size={18} /> Guardar Perfil</button>
+        <button onClick={saveSettings} className="bg-sky-500 text-white px-10 py-5 rounded-[2rem] font-black uppercase text-[10px] flex items-center gap-3 shadow-lg hover:bg-sky-600 transition-all active:scale-95"><Save size={18} /> Guardar Ajustes</button>
       </section>
 
-      {/* Horarios */}
-      <section className="bg-white p-10 rounded-[3.5rem] border shadow-sm space-y-8">
-        <h3 className="text-2xl font-black text-slate-900 flex items-center gap-3"><Clock className="text-amber-500" size={28} /> Horarios de Atención</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-          <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Apertura</label>
-            <input type="time" value={tempSettings.availability.startHour} onChange={e => setTempSettings({...tempSettings, availability: {...tempSettings.availability, startHour: e.target.value}})} className="w-full bg-slate-50 border p-4 rounded-xl font-bold" />
-          </div>
-          <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Cierre</label>
-            <input type="time" value={tempSettings.availability.endHour} onChange={e => setTempSettings({...tempSettings, availability: {...tempSettings.availability, endHour: e.target.value}})} className="w-full bg-slate-50 border p-4 rounded-xl font-bold" />
-          </div>
-        </div>
-      </section>
-
-      {/* Respaldo */}
       <section className="bg-slate-900 p-12 rounded-[4rem] shadow-2xl space-y-8">
-        <h3 className="text-2xl font-black text-white flex items-center gap-3"><Database className="text-emerald-400" size={28} /> Mantenimiento de Datos</h3>
-        <p className="text-slate-400 text-sm font-bold">Resguarda la información de tus pacientes, citas y configuraciones. Puedes restaurar una copia previa en cualquier momento.</p>
+        <h3 className="text-2xl font-black text-white flex items-center gap-3"><Database className="text-emerald-400" size={28} /> Respaldo y Mantenimiento</h3>
+        <p className="text-slate-400 text-sm font-bold">Resguarda toda la base de datos local del sistema.</p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <button onClick={exportData} className="bg-white/10 text-white py-5 rounded-[2rem] font-black uppercase text-[10px] flex items-center justify-center gap-3 hover:bg-white/20 transition-all"><Archive size={18} /> Exportar Backup</button>
+          <button onClick={exportData} className="bg-white/10 text-white py-5 rounded-[2rem] font-black uppercase text-[10px] flex items-center justify-center gap-3 hover:bg-white/20 transition-all"><Archive size={18} /> Exportar JSON</button>
           <div className="relative">
-            <input type="file" accept=".json" onChange={importData} className="hidden" id="import-json" />
-            <label htmlFor="import-json" className="w-full flex items-center justify-center gap-3 bg-sky-500 text-white py-5 rounded-[2rem] font-black uppercase text-[10px] cursor-pointer hover:bg-sky-600 transition-all"><UploadCloud size={18} /> Importar Backup</label>
+            <input type="file" accept=".json" onChange={importData} className="hidden" id="import-json-full" />
+            <label htmlFor="import-json-full" className="w-full flex items-center justify-center gap-3 bg-sky-500 text-white py-5 rounded-[2rem] font-black uppercase text-[10px] cursor-pointer hover:bg-sky-600 transition-all"><UploadCloud size={18} /> Importar Datos</label>
           </div>
         </div>
       </section>
@@ -366,7 +334,7 @@ export const AdminView: React.FC = () => {
            {viewingPatientFile && selectedPatientId ? (
               <div className="space-y-8">
                 <button onClick={() => setViewingPatientFile(false)} className="flex items-center gap-3 text-[10px] font-black uppercase text-slate-400 bg-white px-6 py-3 rounded-full border shadow-sm">
-                  <ChevronLeft size={18} /> Volver a la lista
+                  <ChevronLeft size={18} /> Regresar a la lista
                 </button>
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
                   <div className="lg:col-span-1 bg-white p-10 rounded-[3.5rem] border shadow-xl text-center relative group">
@@ -423,7 +391,6 @@ export const AdminView: React.FC = () => {
             <button onClick={() => setShowAdminModal(true)} className="bg-sky-500 text-white px-8 py-5 rounded-[2rem] font-black uppercase text-[10px] shadow-2xl flex items-center gap-3 active:scale-95 transition-all"><UserPlus size={20} /> Nuevo Administrador</button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {/* Super Admin */}
             <div className="bg-slate-900 p-8 rounded-[3.5rem] shadow-xl text-center relative group">
               <div className="w-20 h-20 rounded-[2.2rem] bg-sky-500/20 flex items-center justify-center font-black text-sky-400 text-2xl mx-auto mb-6">A</div>
               <h4 className="text-lg font-black text-white leading-tight mb-1">Admin Principal</h4>
@@ -431,7 +398,6 @@ export const AdminView: React.FC = () => {
               <div className="px-4 py-1.5 rounded-full text-[9px] font-black uppercase inline-block bg-sky-500 text-white">Super Admin</div>
             </div>
             
-            {/* Admins secundarios */}
             {allUsers.filter(u => u.role === 'admin').map(admin => (
               <div key={admin.id} className="bg-white p-8 rounded-[3.5rem] border border-slate-100 shadow-sm text-center relative group hover:shadow-xl transition-all">
                 <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
@@ -449,31 +415,22 @@ export const AdminView: React.FC = () => {
       )}
       {activeTab === 'Ajustes' && renderAjustes()}
 
-      {/* MODALES REUTILIZABLES */}
+      {/* MODALES */}
       {showEditUserModal && userToEdit && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[200] flex items-center justify-center p-6">
           <div className="bg-white w-full max-w-md rounded-[3.5rem] p-12 shadow-2xl animate-in zoom-in-95">
             <div className="flex justify-between items-center mb-10">
-              <h3 className="text-2xl font-black text-slate-900">Editar Usuario</h3>
+              <h3 className="text-2xl font-black text-slate-900">Editar Perfil</h3>
               <button onClick={() => setShowEditUserModal(false)} className="text-slate-400"><X size={24}/></button>
             </div>
             <form onSubmit={handleUpdateUser} className="space-y-6">
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nombre</label>
-                <input required type="text" value={userToEdit.name} onChange={e => setUserToEdit({...userToEdit, name: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 font-bold outline-none" />
+              <input required type="text" value={userToEdit.name} onChange={e => setUserToEdit({...userToEdit, name: e.target.value})} className="w-full bg-slate-50 border rounded-2xl px-6 py-4 font-bold outline-none" placeholder="Nombre" />
+              <input required type="email" value={userToEdit.email} disabled={userToEdit.email === ROOT_ADMIN_EMAIL} onChange={e => setUserToEdit({...userToEdit, email: e.target.value})} className="w-full bg-slate-50 border rounded-2xl px-6 py-4 font-bold outline-none disabled:opacity-50" placeholder="Email" />
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-sky-300" size={18} />
+                <input type="password" value={userToEdit.password || ''} onChange={e => setUserToEdit({...userToEdit, password: e.target.value})} className="w-full bg-sky-50 border border-sky-100 rounded-2xl px-12 py-4 font-bold text-slate-800 outline-none" placeholder="Actualizar contraseña" />
               </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email</label>
-                <input required type="email" value={userToEdit.email} disabled={userToEdit.email === ROOT_ADMIN_EMAIL} onChange={e => setUserToEdit({...userToEdit, email: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 font-bold outline-none disabled:opacity-50" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-sky-500 uppercase tracking-widest ml-1">Gestionar Contraseña</label>
-                <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-sky-300" size={18} />
-                  <input type="password" value={userToEdit.password || ''} onChange={e => setUserToEdit({...userToEdit, password: e.target.value})} className="w-full bg-sky-50 border border-sky-100 rounded-2xl px-12 py-4 font-bold text-slate-800 outline-none placeholder:text-sky-200" placeholder="Actualizar clave" />
-                </div>
-              </div>
-              <button type="submit" className="w-full py-5 bg-slate-900 text-white rounded-[1.8rem] font-black uppercase text-[10px] mt-4 shadow-xl shadow-slate-200 active:scale-95 transition-all">Guardar Cambios</button>
+              <button type="submit" className="w-full py-5 bg-slate-900 text-white rounded-[1.8rem] font-black uppercase text-[10px] shadow-xl active:scale-95 transition-all">Guardar Cambios</button>
             </form>
           </div>
         </div>
@@ -482,24 +439,16 @@ export const AdminView: React.FC = () => {
       {showAdminModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-6">
           <div className="bg-white w-full max-w-lg rounded-[4rem] p-12 shadow-2xl animate-in zoom-in-95">
-            <div className="flex justify-between items-center mb-10">
-              <h3 className="text-3xl font-black text-slate-900 tracking-tight leading-none">Registrar Miembro</h3>
-              <button onClick={() => setShowAdminModal(false)} className="text-slate-400 hover:text-slate-900"><X size={28}/></button>
-            </div>
+            <h3 className="text-3xl font-black text-slate-900 mb-10">Crear Administrador</h3>
             <form onSubmit={createAdmin} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <input required type="text" value={newAdminData.name} onChange={e => setNewAdminData({...newAdminData, name: e.target.value})} className="w-full bg-slate-50 border rounded-[2rem] px-8 py-5 font-bold outline-none shadow-inner" placeholder="Nombre completo" />
                 <input required type="tel" value={newAdminData.phone} onChange={e => setNewAdminData({...newAdminData, phone: e.target.value})} className="w-full bg-slate-50 border rounded-[2rem] px-8 py-5 font-bold outline-none shadow-inner" placeholder="Teléfono" />
               </div>
               <input required type="email" value={newAdminData.email} onChange={e => setNewAdminData({...newAdminData, email: e.target.value})} className="w-full bg-slate-50 border rounded-[2rem] px-8 py-5 font-bold outline-none shadow-inner" placeholder="Correo electrónico" />
-              <input required type="password" value={newAdminData.password} onChange={e => setNewAdminData({...newAdminData, password: e.target.value})} className="w-full bg-slate-50 border rounded-[2rem] px-8 py-5 font-bold outline-none shadow-inner" placeholder="Contraseña de acceso" />
-              <div className="bg-sky-50 p-6 rounded-3xl flex items-start gap-4 border border-sky-100 mt-4">
-                <ShieldCheck className="text-sky-500 shrink-0" size={24} />
-                <p className="text-[10px] font-bold text-sky-800 leading-relaxed uppercase tracking-widest">
-                  Este usuario tendrá privilegios de administrador completo sobre la gestión de la clínica.
-                </p>
-              </div>
-              <button type="submit" className="w-full py-6 bg-slate-900 text-white rounded-[2.5rem] font-black uppercase tracking-widest mt-4 shadow-2xl active:scale-95 transition-all">Habilitar Administrador</button>
+              <input required type="password" value={newAdminData.password} onChange={e => setNewAdminData({...newAdminData, password: e.target.value})} className="w-full bg-slate-50 border rounded-[2rem] px-8 py-5 font-bold outline-none shadow-inner" placeholder="Contraseña" />
+              <button type="submit" className="w-full py-6 bg-slate-900 text-white rounded-[2.5rem] font-black uppercase tracking-widest shadow-2xl active:scale-95 transition-all">Registrar Admin</button>
+              <button type="button" onClick={() => setShowAdminModal(false)} className="w-full text-slate-400 font-bold uppercase text-[10px] mt-2 tracking-widest">Cerrar</button>
             </form>
           </div>
         </div>
@@ -514,14 +463,15 @@ export const AdminView: React.FC = () => {
             </div>
             <div className="relative mb-6">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-              <input type="text" placeholder="Buscar por nombre..." value={patientSearch} onChange={e => setPatientSearch(e.target.value)} className="w-full bg-slate-50 border rounded-2xl pl-12 pr-6 py-4 font-bold outline-none" />
+              <input type="text" placeholder="Buscar paciente por nombre..." value={patientSearch} onChange={e => setPatientSearch(e.target.value)} className="w-full bg-slate-50 border rounded-2xl pl-12 pr-6 py-4 font-bold outline-none" />
             </div>
             <div className="max-h-[300px] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
               {allUsers.filter(u => u.role === 'client' && u.name.toLowerCase().includes(patientSearch.toLowerCase())).map(p => (
                 <button key={p.id} onClick={() => {
                   setAppointments(prev => prev.map(app => app.id === appointmentToAssign.id ? { ...app, status: 'approved', clientId: p.id, clientName: p.name } : app));
-                  addNotification(p.id, "Cita Asignada", `Te han agendado una cita para el ${appointmentToAssign.date} a las ${appointmentToAssign.startTime}.`, 'status_change');
+                  addNotification(p.id, "Cita Asignada", `Turno agendado para el ${appointmentToAssign.date} a las ${appointmentToAssign.startTime}.`, 'status_change');
                   setShowAssignModal(false);
+                  setPatientSearch('');
                 }} className="w-full flex items-center gap-4 p-4 hover:bg-sky-50 rounded-2xl transition-all group border border-transparent hover:border-sky-100">
                   <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center font-black text-slate-400 group-hover:bg-sky-500 group-hover:text-white transition-all shadow-inner">{p.name.charAt(0)}</div>
                   <div className="text-left"><p className="text-sm font-black text-slate-800">{p.name}</p><p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">{p.email}</p></div>
@@ -535,15 +485,15 @@ export const AdminView: React.FC = () => {
       {showSlotModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-6">
           <div className="bg-white w-full max-w-lg rounded-[4rem] p-12 shadow-2xl animate-in zoom-in-95">
-            <h3 className="text-3xl font-black text-slate-900 mb-10">Habilitar Turno</h3>
+            <h3 className="text-3xl font-black text-slate-900 mb-10">Publicar Turno</h3>
             <form onSubmit={createSlot} className="space-y-8">
               <input required type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} min={todayStr} className="w-full bg-slate-50 border border-slate-200 rounded-[2rem] px-8 py-5 font-black text-lg outline-none" />
               <div className="grid grid-cols-2 gap-6">
                 <input required type="time" value={slotStart} onChange={e => setSlotStart(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 font-bold outline-none" />
                 <input required type="time" value={slotEnd} onChange={e => setSlotEnd(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 font-bold outline-none" />
               </div>
-              <button type="submit" className="w-full py-6 bg-slate-900 text-white rounded-[2.5rem] font-black uppercase mt-4 shadow-xl active:scale-95 transition-all">Publicar Espacio</button>
-              <button type="button" onClick={() => setShowSlotModal(false)} className="w-full text-slate-400 font-bold uppercase text-[10px] tracking-widest mt-2 hover:text-slate-900 transition-colors">Cancelar</button>
+              <button type="submit" className="w-full py-6 bg-slate-900 text-white rounded-[2.5rem] font-black uppercase mt-4 shadow-xl active:scale-95 transition-all">Publicar en Agenda</button>
+              <button type="button" onClick={() => setShowSlotModal(false)} className="w-full text-slate-400 font-bold uppercase text-[10px] tracking-widest mt-2">Cancelar</button>
             </form>
           </div>
         </div>
