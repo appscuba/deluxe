@@ -26,12 +26,12 @@ const AuthScreen: React.FC = () => {
     const DEFAULT_ADMIN_PASS = 'Asd9310*';
 
     if (authMode === 'login') {
-      // Root Admin Login
-      if (formData.email === DEFAULT_ADMIN_EMAIL && formData.password === DEFAULT_ADMIN_PASS) {
+      // 1. Verificar Super Admin
+      if (formData.email.toLowerCase() === DEFAULT_ADMIN_EMAIL.toLowerCase() && formData.password === DEFAULT_ADMIN_PASS) {
         setCurrentUser({
           id: 'admin_root',
           name: 'Admin Principal',
-          email: formData.email,
+          email: DEFAULT_ADMIN_EMAIL,
           phone: '000000000',
           role: 'admin',
           createdAt: new Date().toISOString()
@@ -39,26 +39,30 @@ const AuthScreen: React.FC = () => {
         return;
       }
 
-      // Dynamic User Login (Clients or other Admins)
-      // Validación estricta de Email Y Contraseña
-      const existingUser = allUsers.find(u => u.email === formData.email && u.password === formData.password);
+      // 2. Verificar Usuarios en la DB local (Admins secundarios o Clientes)
+      const existingUser = allUsers.find(u => 
+        u.email.toLowerCase() === formData.email.toLowerCase() && 
+        u.password === formData.password
+      );
       
       if (existingUser) {
         setCurrentUser(existingUser);
         return;
       }
 
-      setError('Email o contraseña incorrectos. Por favor, verifique sus datos.');
+      setError('Credenciales inválidas. Verifica tu correo y contraseña.');
     } else {
-      // Registration logic
-      const emailExists = allUsers.some(u => u.email === formData.email) || formData.email === DEFAULT_ADMIN_EMAIL;
+      // Lógica de Registro
+      const emailExists = allUsers.some(u => u.email.toLowerCase() === formData.email.toLowerCase()) || 
+                          formData.email.toLowerCase() === DEFAULT_ADMIN_EMAIL.toLowerCase();
+      
       if (emailExists) {
-        setError('Este correo ya está registrado.');
+        setError('Este correo electrónico ya está registrado.');
         return;
       }
 
       if (!formData.phone || formData.phone.length < 7) {
-        setError('Por favor, ingresa un número de teléfono válido.');
+        setError('Número de teléfono inválido.');
         return;
       }
 
@@ -67,10 +71,11 @@ const AuthScreen: React.FC = () => {
         name: formData.name,
         email: formData.email,
         phone: formData.phone,
-        password: formData.password, // Se guarda la contraseña proporcionada
+        password: formData.password,
         role: 'client',
         createdAt: new Date().toISOString()
       };
+      
       setAllUsers(prev => [...prev, newUser]);
       setCurrentUser(newUser);
     }
@@ -147,7 +152,7 @@ const AuthScreen: React.FC = () => {
 
             {authMode === 'register' && (
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Teléfono (Obligatorio)</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Teléfono</label>
                 <div className="relative">
                   <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                   <input 

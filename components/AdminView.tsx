@@ -1,20 +1,15 @@
 
 import React, { useState, useMemo, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Appointment, Treatment, User, Notification, PatientRecord, ClinicAvailability } from '../types';
+import { Appointment, User, PatientRecord, ClinicSettings } from '../types';
 import { Odontogram } from './Odontogram';
 import { 
   CheckCircle2, 
-  XCircle, 
-  Clock, 
-  TrendingUp,
-  DollarSign,
   Trash2,
   Calendar as CalendarIcon,
   Plus,
   X,
   Search,
-  Settings,
   Activity,
   ChevronRight,
   ChevronLeft,
@@ -26,7 +21,13 @@ import {
   UploadCloud,
   Archive,
   Edit2,
-  UserCheck
+  UserCheck,
+  Building2,
+  Phone,
+  Mail,
+  MapPin,
+  Clock,
+  Save
 } from 'lucide-react';
 
 export const AdminView: React.FC = () => {
@@ -38,11 +39,11 @@ export const AdminView: React.FC = () => {
     allUsers, 
     setAllUsers,
     activeTab,
-    availability,
-    setAvailability,
+    clinicSettings,
+    setClinicSettings,
     patientRecords,
     updatePatientOdontogram,
-    notifications,
+    setPatientRecords,
     setNotifications
   } = useAppContext();
 
@@ -59,6 +60,9 @@ export const AdminView: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [newAdminData, setNewAdminData] = useState({ name: '', email: '', password: '', phone: '' });
   
+  // Ajustes de Clínica
+  const [tempSettings, setTempSettings] = useState<ClinicSettings>(clinicSettings);
+
   // Asignación de Cita
   const [appointmentToAssign, setAppointmentToAssign] = useState<Appointment | null>(null);
   const [patientSearch, setPatientSearch] = useState('');
@@ -106,7 +110,7 @@ export const AdminView: React.FC = () => {
     if (!userToEdit) return;
     setAllUsers(prev => prev.map(u => u.id === userToEdit.id ? userToEdit : u));
     setShowEditUserModal(false);
-    alert('Perfil actualizado con éxito.');
+    alert('Usuario actualizado con éxito. Las nuevas credenciales ya están activas.');
   };
 
   const updateStatus = (id: string, newStatus: Appointment['status']) => {
@@ -139,7 +143,7 @@ export const AdminView: React.FC = () => {
   const createAdmin = (e: React.FormEvent) => {
     e.preventDefault();
     if (allUsers.some(u => u.email.toLowerCase() === newAdminData.email.toLowerCase())) {
-      alert("Este email ya está en uso.");
+      alert("Este email ya está registrado.");
       return;
     }
     const newUser: User = {
@@ -147,32 +151,78 @@ export const AdminView: React.FC = () => {
       name: newAdminData.name,
       email: newAdminData.email,
       phone: newAdminData.phone,
-      password: newAdminData.password,
+      password: newAdminData.password, // Importante: Se guarda la contraseña
       role: 'admin',
       createdAt: new Date().toISOString()
     };
     setAllUsers(prev => [...prev, newUser]);
     setNewAdminData({ name: '', email: '', password: '', phone: '' });
     setShowAdminModal(false);
+    alert("Administrador creado exitosamente.");
   };
 
-  const assignPatientToSlot = (patient: User) => {
-    if (!appointmentToAssign) return;
-    setAppointments(prev => prev.map(app => 
-      app.id === appointmentToAssign.id 
-      ? { ...app, status: 'approved', clientId: patient.id, clientName: patient.name } 
-      : app
-    ));
-    addNotification(patient.id, "Cita Asignada", `La administración te ha asignado una cita para el ${appointmentToAssign.date} a las ${appointmentToAssign.startTime}.`, 'status_change');
-    setShowAssignModal(false);
-    setAppointmentToAssign(null);
+  const saveSettings = () => {
+    setClinicSettings(tempSettings);
+    alert("Configuración de la clínica guardada correctamente.");
   };
 
-  const removeSlot = (id: string) => {
-    if (confirm('¿Eliminar este turno de la agenda?')) {
-      setAppointments(prev => prev.filter(a => a.id !== id));
-    }
+  const exportData = () => {
+    const data = {
+      allUsers,
+      appointments,
+      clinicSettings,
+      patientRecords,
+      exportDate: new Date().toISOString()
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `backup_deluxe_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
   };
+
+  const importData = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = JSON.parse(event.target?.result as string);
+        if (data.allUsers) setAllUsers(data.allUsers);
+        if (data.appointments) setAppointments(data.appointments);
+        if (data.clinicSettings) setClinicSettings(data.clinicSettings);
+        if (data.patientRecords) setPatientRecords(data.patientRecords);
+        alert("Restauración completada satisfactoriamente.");
+      } catch (err) {
+        alert("Archivo inválido o corrupto.");
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const renderDashboard = () => (
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-sky-500 p-6 rounded-[2.5rem] text-white shadow-xl flex flex-col justify-between h-40">
+          <Activity size={24} className="opacity-50" />
+          <div><p className="text-[10px] font-black uppercase tracking-widest opacity-80">Citas Pendientes</p><p className="text-3xl font-black">{bookings.filter(b => b.status === 'pending').length}</p></div>
+        </div>
+        <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col justify-between h-40">
+          <CheckCircle2 size={24} className="text-emerald-500 opacity-50" />
+          <div><p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Hoy</p><p className="text-3xl font-black text-slate-800">{bookings.filter(b => b.date === todayStr).length}</p></div>
+        </div>
+        <div className="bg-slate-900 p-6 rounded-[2.5rem] text-white shadow-xl flex flex-col justify-between h-40">
+          <ShieldCheck size={24} className="text-sky-400 opacity-50" />
+          <div><p className="text-[10px] font-black uppercase tracking-widest opacity-80">Equipo</p><p className="text-3xl font-black">{allUsers.filter(u => u.role === 'admin').length + 1}</p></div>
+        </div>
+        <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col justify-between h-40">
+          <CalendarIcon size={24} className="text-sky-500 opacity-50" />
+          <div><p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Pacientes</p><p className="text-3xl font-black text-slate-800">{allUsers.filter(u => u.role === 'client').length}</p></div>
+        </div>
+      </div>
+    </div>
+  );
 
   const renderCalendar = () => {
     const dayAppointments = appointments.filter(a => a.date === selectedDate).sort((a,b) => a.startTime.localeCompare(b.startTime));
@@ -198,7 +248,7 @@ export const AdminView: React.FC = () => {
               ))}
             </div>
           </div>
-          <button onClick={() => setShowSlotModal(true)} className="w-full bg-slate-900 text-white py-6 rounded-[2.5rem] font-black uppercase text-[10px] flex items-center justify-center gap-3 shadow-2xl">
+          <button onClick={() => setShowSlotModal(true)} className="w-full bg-slate-900 text-white py-6 rounded-[2.5rem] font-black uppercase text-[10px] flex items-center justify-center gap-3 shadow-2xl active:scale-95 transition-transform">
             <Plus size={20} /> Nuevo Espacio Libre
           </button>
         </div>
@@ -207,12 +257,14 @@ export const AdminView: React.FC = () => {
           <h3 className="text-2xl font-black text-slate-900 mb-8 tracking-tight">Citas para el {selectedDate}</h3>
           <div className="space-y-4">
             {dayAppointments.length > 0 ? dayAppointments.map(app => (
-              <div key={app.id} className={`p-6 rounded-[2.5rem] border transition-all flex items-center justify-between ${app.status === 'available' ? 'bg-slate-50/50 border-dashed' : 'bg-white'}`}>
+              <div key={app.id} className={`p-6 rounded-[2.5rem] border transition-all flex items-center justify-between ${app.status === 'available' ? 'bg-slate-50/50 border-dashed' : 'bg-white shadow-sm'}`}>
                 <div className="flex items-center gap-6">
-                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black ${app.status === 'available' ? 'bg-white text-slate-300' : 'bg-sky-500 text-white'}`}>{app.startTime}</div>
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black ${app.status === 'available' ? 'bg-white text-slate-300 border border-slate-100' : 'bg-sky-500 text-white'}`}>{app.startTime}</div>
                   <div>
                     <h4 className="text-lg font-black text-slate-800">{app.status === 'available' ? 'Espacio Libre' : app.clientName}</h4>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{app.status === 'pending' ? 'Solicitud Pendiente' : app.status === 'available' ? 'Sin asignar' : 'Cita Confirmada'}</p>
+                    <p className={`text-[10px] font-bold uppercase tracking-widest ${app.status === 'pending' ? 'text-amber-500' : 'text-slate-400'}`}>
+                      {app.status === 'pending' ? 'Solicitud Pendiente' : app.status === 'available' ? 'Disponible para paciente' : 'Cita Confirmada'}
+                    </p>
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -222,159 +274,182 @@ export const AdminView: React.FC = () => {
                     </button>
                   )}
                   {app.status === 'pending' && (
-                    <>
-                      <button onClick={() => updateStatus(app.id, 'approved')} className="bg-emerald-500 text-white px-5 py-3 rounded-2xl text-[9px] font-black uppercase">Aceptar</button>
-                      <button onClick={() => updateStatus(app.id, 'rejected')} className="bg-rose-50 text-rose-500 px-5 py-3 rounded-2xl text-[9px] font-black uppercase">Rechazar</button>
-                    </>
+                    <div className="flex gap-2">
+                      <button onClick={() => updateStatus(app.id, 'approved')} className="bg-emerald-500 text-white px-5 py-3 rounded-2xl text-[9px] font-black uppercase shadow-lg shadow-emerald-100 active:scale-90">Aceptar</button>
+                      <button onClick={() => updateStatus(app.id, 'rejected')} className="bg-rose-50 text-rose-500 px-5 py-3 rounded-2xl text-[9px] font-black uppercase hover:bg-rose-500 hover:text-white transition-all active:scale-90">Rechazar</button>
+                    </div>
                   )}
-                  <button onClick={() => removeSlot(app.id)} className="p-3 text-slate-300 hover:text-rose-500"><Trash2 size={18} /></button>
+                  <button onClick={() => { if(confirm('¿Eliminar turno?')) setAppointments(prev => prev.filter(a => a.id !== app.id)) }} className="p-3 text-slate-200 hover:text-rose-500 transition-colors"><Trash2 size={18} /></button>
                 </div>
               </div>
-            )) : <div className="py-24 text-center opacity-20 font-black uppercase text-[10px] tracking-widest">No hay espacios configurados</div>}
+            )) : <div className="py-24 text-center opacity-20 font-black uppercase text-[10px] tracking-widest">Agenda vacía para hoy</div>}
           </div>
         </div>
       </div>
     );
   };
 
-  const renderPatients = () => {
-    const filtered = allUsers.filter(u => u.role === 'client' && u.name.toLowerCase().includes(searchTerm.toLowerCase()));
-    if (viewingPatientFile && selectedPatientId) {
-      const patient = allUsers.find(u => u.id === selectedPatientId);
-      const record = patientRecords.find(r => r.patientId === selectedPatientId);
-      return (
-        <div className="space-y-8 animate-in slide-in-from-right-12 duration-500">
-          <button onClick={() => setViewingPatientFile(false)} className="flex items-center gap-3 text-[10px] font-black uppercase text-slate-400 bg-white px-6 py-3 rounded-full border shadow-sm">
-            <ChevronLeft size={18} /> Regresar a lista
-          </button>
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-            <div className="lg:col-span-1 bg-white p-10 rounded-[3.5rem] border shadow-xl text-center relative group">
-              <div className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button onClick={() => { setUserToEdit(patient!); setShowEditUserModal(true); }} className="p-3 bg-slate-900 text-white rounded-2xl"><Edit2 size={16} /></button>
-              </div>
-              <div className="w-28 h-28 bg-sky-500 text-white rounded-[2.5rem] flex items-center justify-center text-4xl font-black mx-auto mb-6">{patient?.name.charAt(0)}</div>
-              <h2 className="text-2xl font-black text-slate-900">{patient?.name}</h2>
-              <p className="text-xs text-slate-400 font-bold mt-2">{patient?.phone}</p>
+  const renderAjustes = () => (
+    <div className="max-w-4xl mx-auto space-y-12 animate-in slide-in-from-bottom-6 duration-700">
+      {/* Datos de la Clínica */}
+      <section className="bg-white p-10 rounded-[3.5rem] border shadow-sm space-y-8">
+        <h3 className="text-2xl font-black text-slate-900 flex items-center gap-3"><Building2 className="text-sky-500" size={28} /> Perfil de Clínica</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nombre Comercial</label>
+            <div className="relative">
+              <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+              <input type="text" value={tempSettings.name} onChange={e => setTempSettings({...tempSettings, name: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-12 py-4 font-bold outline-none focus:ring-4 focus:ring-sky-500/10" />
             </div>
-            <div className="lg:col-span-3 bg-white p-12 rounded-[4rem] border shadow-sm">
-              <h3 className="text-2xl font-black text-slate-900 mb-10 flex items-center gap-3"><Stethoscope size={28} className="text-sky-500" /> Odontograma</h3>
-              <Odontogram toothStates={record?.odontogram || []} onUpdateTooth={(id, condition) => {
-                const newOdo = [...(record?.odontogram || [])];
-                const idx = newOdo.findIndex(s => s.id === id);
-                if (idx >= 0) newOdo[idx] = { ...newOdo[idx], condition };
-                else newOdo.push({ id, condition });
-                updatePatientOdontogram(selectedPatientId!, newOdo);
-              }} />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Teléfono Público</label>
+            <div className="relative">
+              <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+              <input type="text" value={tempSettings.phone} onChange={e => setTempSettings({...tempSettings, phone: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-12 py-4 font-bold outline-none" />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email de Contacto</label>
+            <div className="relative">
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+              <input type="email" value={tempSettings.email} onChange={e => setTempSettings({...tempSettings, email: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-12 py-4 font-bold outline-none" />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Dirección Física</label>
+            <div className="relative">
+              <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+              <input type="text" value={tempSettings.address} onChange={e => setTempSettings({...tempSettings, address: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-12 py-4 font-bold outline-none" />
             </div>
           </div>
         </div>
-      );
-    }
-    return (
-      <div className="space-y-8 animate-in fade-in duration-500">
-        <div className="flex items-center justify-between gap-6 px-4">
-          <h3 className="text-3xl font-black text-slate-900">Pacientes</h3>
-          <div className="relative w-96">
-            <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-            <input type="text" placeholder="Buscar paciente..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-16 pr-8 py-5 bg-white border rounded-[2rem] text-sm font-bold shadow-sm outline-none" />
+        <button onClick={saveSettings} className="bg-sky-500 text-white px-10 py-5 rounded-[2rem] font-black uppercase text-[10px] flex items-center gap-3 shadow-lg hover:bg-sky-600 transition-all"><Save size={18} /> Guardar Perfil</button>
+      </section>
+
+      {/* Horarios */}
+      <section className="bg-white p-10 rounded-[3.5rem] border shadow-sm space-y-8">
+        <h3 className="text-2xl font-black text-slate-900 flex items-center gap-3"><Clock className="text-amber-500" size={28} /> Horarios de Atención</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Apertura</label>
+            <input type="time" value={tempSettings.availability.startHour} onChange={e => setTempSettings({...tempSettings, availability: {...tempSettings.availability, startHour: e.target.value}})} className="w-full bg-slate-50 border p-4 rounded-xl font-bold" />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Cierre</label>
+            <input type="time" value={tempSettings.availability.endHour} onChange={e => setTempSettings({...tempSettings, availability: {...tempSettings.availability, endHour: e.target.value}})} className="w-full bg-slate-50 border p-4 rounded-xl font-bold" />
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filtered.map(user => (
-            <div key={user.id} className="bg-white p-8 rounded-[3.5rem] border shadow-sm group text-center relative hover:shadow-2xl transition-all">
-              <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                 <button onClick={() => { setUserToEdit(user); setShowEditUserModal(true); }} className="p-2 text-slate-400 hover:text-slate-900"><Edit2 size={16} /></button>
-                 <button onClick={() => handleDeleteUser(user.id, user.email)} className="p-2 text-slate-400 hover:text-rose-500"><Trash2 size={16} /></button>
-              </div>
-              <div className="w-20 h-20 rounded-[2.2rem] bg-slate-50 flex items-center justify-center font-black text-slate-400 text-2xl mx-auto mb-6 group-hover:bg-sky-50 transition-colors">{user.name.charAt(0)}</div>
-              <h4 className="text-lg font-black text-slate-800 mb-8">{user.name}</h4>
-              <button onClick={() => { setSelectedPatientId(user.id); setViewingPatientFile(true); }} className="w-full py-4 bg-slate-50 text-slate-600 rounded-[1.5rem] font-black uppercase text-[9px] hover:bg-slate-900 hover:text-white transition-all">Expediente</button>
-            </div>
-          ))}
+      </section>
+
+      {/* Respaldo */}
+      <section className="bg-slate-900 p-12 rounded-[4rem] shadow-2xl space-y-8">
+        <h3 className="text-2xl font-black text-white flex items-center gap-3"><Database className="text-emerald-400" size={28} /> Mantenimiento de Datos</h3>
+        <p className="text-slate-400 text-sm font-bold">Resguarda la información de tus pacientes, citas y configuraciones. Puedes restaurar una copia previa en cualquier momento.</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <button onClick={exportData} className="bg-white/10 text-white py-5 rounded-[2rem] font-black uppercase text-[10px] flex items-center justify-center gap-3 hover:bg-white/20 transition-all"><Archive size={18} /> Exportar Backup</button>
+          <div className="relative">
+            <input type="file" accept=".json" onChange={importData} className="hidden" id="import-json" />
+            <label htmlFor="import-json" className="w-full flex items-center justify-center gap-3 bg-sky-500 text-white py-5 rounded-[2rem] font-black uppercase text-[10px] cursor-pointer hover:bg-sky-600 transition-all"><UploadCloud size={18} /> Importar Backup</label>
+          </div>
         </div>
-      </div>
-    );
-  };
+      </section>
+    </div>
+  );
 
   return (
     <div className="pb-32">
-      {activeTab === 'Dashboard' && <div className="space-y-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-sky-500 p-6 rounded-[2.5rem] text-white shadow-xl flex flex-col justify-between h-40">
-            <DollarSign size={24} className="opacity-50" />
-            <div><p className="text-[10px] font-black uppercase tracking-widest opacity-80">Ingresos Hoy</p><p className="text-3xl font-black">${bookings.filter(a => a.date === todayStr && a.status === 'completed').reduce((acc, c) => acc + (c.paidAmount || 0), 0)}</p></div>
-          </div>
-          <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col justify-between h-40">
-            <Clock size={24} className="text-amber-500 opacity-50" />
-            <div><p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Pendientes</p><p className="text-3xl font-black text-slate-800">{bookings.filter(b => b.status === 'pending').length}</p></div>
-          </div>
-          <div className="bg-slate-900 p-6 rounded-[2.5rem] text-white shadow-xl flex flex-col justify-between h-40">
-            <TrendingUp size={24} className="text-emerald-400 opacity-50" />
-            <div><p className="text-[10px] font-black uppercase tracking-widest opacity-80">Pacientes</p><p className="text-3xl font-black">{allUsers.filter(u => u.role === 'client').length}</p></div>
-          </div>
-          <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col justify-between h-40">
-            <CalendarIcon size={24} className="text-sky-500 opacity-50" />
-            <div><p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Citas Hoy</p><p className="text-3xl font-black text-slate-800">{bookings.filter(b => b.date === todayStr).length}</p></div>
-          </div>
-        </div>
-      </div>}
+      {activeTab === 'Dashboard' && renderDashboard()}
       {activeTab === 'Calendario' && renderCalendar()}
-      {activeTab === 'Pacientes' && renderPatients()}
+      {activeTab === 'Pacientes' && (
+        <div className="space-y-8 animate-in fade-in duration-500">
+           {viewingPatientFile && selectedPatientId ? (
+              <div className="space-y-8">
+                <button onClick={() => setViewingPatientFile(false)} className="flex items-center gap-3 text-[10px] font-black uppercase text-slate-400 bg-white px-6 py-3 rounded-full border shadow-sm">
+                  <ChevronLeft size={18} /> Volver a la lista
+                </button>
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                  <div className="lg:col-span-1 bg-white p-10 rounded-[3.5rem] border shadow-xl text-center relative group">
+                    <div className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => { setUserToEdit(allUsers.find(u => u.id === selectedPatientId)!); setShowEditUserModal(true); }} className="p-3 bg-slate-900 text-white rounded-2xl"><Edit2 size={16} /></button>
+                    </div>
+                    <div className="w-28 h-28 bg-sky-500 text-white rounded-[2.5rem] flex items-center justify-center text-4xl font-black mx-auto mb-6 shadow-xl shadow-sky-100">{allUsers.find(u => u.id === selectedPatientId)?.name.charAt(0)}</div>
+                    <h2 className="text-2xl font-black text-slate-900">{allUsers.find(u => u.id === selectedPatientId)?.name}</h2>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-2">{allUsers.find(u => u.id === selectedPatientId)?.phone}</p>
+                  </div>
+                  <div className="lg:col-span-3 bg-white p-12 rounded-[4rem] border shadow-sm">
+                    <h3 className="text-2xl font-black text-slate-900 mb-10 flex items-center gap-3"><Stethoscope size={28} className="text-sky-500" /> Odontograma Digital</h3>
+                    <Odontogram toothStates={patientRecords.find(r => r.patientId === selectedPatientId)?.odontogram || []} onUpdateTooth={(id, condition) => {
+                      const record = patientRecords.find(r => r.patientId === selectedPatientId);
+                      const newOdo = [...(record?.odontogram || [])];
+                      const idx = newOdo.findIndex(s => s.id === id);
+                      if (idx >= 0) newOdo[idx] = { ...newOdo[idx], condition };
+                      else newOdo.push({ id, condition });
+                      updatePatientOdontogram(selectedPatientId!, newOdo);
+                    }} />
+                  </div>
+                </div>
+              </div>
+           ) : (
+             <>
+               <div className="flex items-center justify-between gap-6 px-4">
+                  <h3 className="text-3xl font-black text-slate-900">Pacientes</h3>
+                  <div className="relative w-96">
+                    <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                    <input type="text" placeholder="Buscar paciente..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-16 pr-8 py-5 bg-white border border-slate-200 rounded-[2rem] text-sm font-bold shadow-sm outline-none focus:ring-4 focus:ring-sky-500/10" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {allUsers.filter(u => u.role === 'client' && u.name.toLowerCase().includes(searchTerm.toLowerCase())).map(user => (
+                    <div key={user.id} className="bg-white p-8 rounded-[3.5rem] border border-slate-100 shadow-sm group text-center relative hover:shadow-2xl transition-all">
+                      <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                         <button onClick={() => { setUserToEdit(user); setShowEditUserModal(true); }} className="p-2 text-slate-400 hover:text-sky-500"><Edit2 size={16} /></button>
+                         <button onClick={() => handleDeleteUser(user.id, user.email)} className="p-2 text-slate-400 hover:text-rose-500"><Trash2 size={16} /></button>
+                      </div>
+                      <div className="w-20 h-20 rounded-[2.2rem] bg-slate-50 flex items-center justify-center font-black text-slate-400 text-2xl mx-auto mb-6 group-hover:bg-sky-50 group-hover:text-sky-500 transition-colors shadow-inner">{user.name.charAt(0)}</div>
+                      <h4 className="text-lg font-black text-slate-800 mb-8">{user.name}</h4>
+                      <button onClick={() => { setSelectedPatientId(user.id); setViewingPatientFile(true); }} className="w-full py-4 bg-slate-50 text-slate-600 rounded-[1.5rem] font-black uppercase text-[9px] hover:bg-slate-900 hover:text-white transition-all shadow-sm">Ver Expediente</button>
+                    </div>
+                  ))}
+                </div>
+             </>
+           )}
+        </div>
+      )}
       {activeTab === 'Equipo' && (
         <div className="space-y-8 animate-in fade-in duration-500">
           <div className="flex items-center justify-between gap-6 px-4">
             <h3 className="text-3xl font-black text-slate-900">Equipo Médico</h3>
-            <button onClick={() => setShowAdminModal(true)} className="bg-sky-500 text-white px-8 py-5 rounded-[2rem] font-black uppercase text-[10px] shadow-2xl flex items-center gap-3"><UserPlus size={20} /> Nuevo Admin</button>
+            <button onClick={() => setShowAdminModal(true)} className="bg-sky-500 text-white px-8 py-5 rounded-[2rem] font-black uppercase text-[10px] shadow-2xl flex items-center gap-3 active:scale-95 transition-all"><UserPlus size={20} /> Nuevo Administrador</button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {allUsers.filter(u => u.role === 'admin').map(admin => {
-              const isGlobal = admin.email === ROOT_ADMIN_EMAIL;
-              const canEditThis = !isGlobal || currentUser?.email === ROOT_ADMIN_EMAIL;
-              return (
-                <div key={admin.id} className="bg-white p-8 rounded-[3.5rem] border shadow-sm text-center relative group">
-                  {canEditThis && !isGlobal && (
-                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                      <button onClick={() => { setUserToEdit(admin); setShowEditUserModal(true); }} className="p-2 text-slate-400 hover:text-slate-900"><Edit2 size={16} /></button>
-                      <button onClick={() => handleDeleteUser(admin.id, admin.email)} className="p-2 text-slate-400 hover:text-rose-500"><Trash2 size={16} /></button>
-                    </div>
-                  )}
-                  <div className="w-20 h-20 rounded-[2.2rem] bg-slate-50 flex items-center justify-center font-black text-slate-400 text-2xl mx-auto mb-6">{admin.name.charAt(0)}</div>
-                  <h4 className="text-lg font-black text-slate-800 leading-tight mb-1">{admin.name}</h4>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase mb-4">{admin.email}</p>
-                  <div className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase inline-block ${isGlobal ? 'bg-slate-900 text-white' : 'bg-sky-50 text-sky-600'}`}>{isGlobal ? 'Super Admin' : 'Admin'}</div>
+            {/* Super Admin */}
+            <div className="bg-slate-900 p-8 rounded-[3.5rem] shadow-xl text-center relative group">
+              <div className="w-20 h-20 rounded-[2.2rem] bg-sky-500/20 flex items-center justify-center font-black text-sky-400 text-2xl mx-auto mb-6">A</div>
+              <h4 className="text-lg font-black text-white leading-tight mb-1">Admin Principal</h4>
+              <p className="text-[10px] text-slate-500 font-bold uppercase mb-4">{ROOT_ADMIN_EMAIL}</p>
+              <div className="px-4 py-1.5 rounded-full text-[9px] font-black uppercase inline-block bg-sky-500 text-white">Super Admin</div>
+            </div>
+            
+            {/* Admins secundarios */}
+            {allUsers.filter(u => u.role === 'admin').map(admin => (
+              <div key={admin.id} className="bg-white p-8 rounded-[3.5rem] border border-slate-100 shadow-sm text-center relative group hover:shadow-xl transition-all">
+                <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                  <button onClick={() => { setUserToEdit(admin); setShowEditUserModal(true); }} className="p-2 text-slate-400 hover:text-sky-500"><Edit2 size={16} /></button>
+                  <button onClick={() => handleDeleteUser(admin.id, admin.email)} className="p-2 text-slate-400 hover:text-rose-500"><Trash2 size={16} /></button>
                 </div>
-              );
-            })}
+                <div className="w-20 h-20 rounded-[2.2rem] bg-slate-50 flex items-center justify-center font-black text-slate-400 text-2xl mx-auto mb-6 group-hover:bg-sky-50 transition-colors shadow-inner">{admin.name.charAt(0)}</div>
+                <h4 className="text-lg font-black text-slate-800 leading-tight mb-1">{admin.name}</h4>
+                <p className="text-[10px] text-slate-400 font-bold uppercase mb-4">{admin.email}</p>
+                <div className="px-4 py-1.5 rounded-full text-[9px] font-black uppercase inline-block bg-sky-50 text-sky-600">Admin Staff</div>
+              </div>
+            ))}
           </div>
         </div>
       )}
+      {activeTab === 'Ajustes' && renderAjustes()}
 
-      {/* MODAL ASIGNAR PACIENTE (Calendar) */}
-      {showAssignModal && appointmentToAssign && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[200] flex items-center justify-center p-6">
-          <div className="bg-white w-full max-w-md rounded-[3.5rem] p-10 shadow-2xl animate-in zoom-in-95">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-2xl font-black text-slate-900">Agendar Paciente</h3>
-              <button onClick={() => setShowAssignModal(false)} className="text-slate-400"><X size={24}/></button>
-            </div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">Cita: {appointmentToAssign.date} a las {appointmentToAssign.startTime}</p>
-            <div className="relative mb-6">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-              <input type="text" placeholder="Buscar paciente por nombre..." value={patientSearch} onChange={e => setPatientSearch(e.target.value)} className="w-full bg-slate-50 border rounded-2xl pl-12 pr-6 py-4 font-bold outline-none" />
-            </div>
-            <div className="max-h-[300px] overflow-y-auto space-y-2 pr-2">
-              {allUsers.filter(u => u.role === 'client' && u.name.toLowerCase().includes(patientSearch.toLowerCase())).map(p => (
-                <button key={p.id} onClick={() => assignPatientToSlot(p)} className="w-full flex items-center gap-4 p-4 hover:bg-sky-50 rounded-2xl transition-all group border border-transparent hover:border-sky-100">
-                  <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center font-black text-slate-400 group-hover:bg-sky-500 group-hover:text-white transition-all">{p.name.charAt(0)}</div>
-                  <div className="text-left"><p className="text-sm font-black text-slate-800">{p.name}</p><p className="text-[10px] text-slate-400 font-bold">{p.email}</p></div>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL EDICIÓN USUARIO (Cualquier Admin) */}
+      {/* MODALES REUTILIZABLES */}
       {showEditUserModal && userToEdit && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[200] flex items-center justify-center p-6">
           <div className="bg-white w-full max-w-md rounded-[3.5rem] p-12 shadow-2xl animate-in zoom-in-95">
@@ -385,59 +460,90 @@ export const AdminView: React.FC = () => {
             <form onSubmit={handleUpdateUser} className="space-y-6">
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nombre</label>
-                <input required type="text" value={userToEdit.name} onChange={e => setUserToEdit({...userToEdit, name: e.target.value})} className="w-full bg-slate-50 border rounded-2xl px-6 py-4 font-bold outline-none" />
+                <input required type="text" value={userToEdit.name} onChange={e => setUserToEdit({...userToEdit, name: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 font-bold outline-none" />
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email</label>
-                <input required type="email" value={userToEdit.email} disabled={userToEdit.email === ROOT_ADMIN_EMAIL} onChange={e => setUserToEdit({...userToEdit, email: e.target.value})} className="w-full bg-slate-50 border rounded-2xl px-6 py-4 font-bold outline-none disabled:opacity-50" />
+                <input required type="email" value={userToEdit.email} disabled={userToEdit.email === ROOT_ADMIN_EMAIL} onChange={e => setUserToEdit({...userToEdit, email: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 font-bold outline-none disabled:opacity-50" />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-sky-500 uppercase tracking-widest ml-1">Nueva Contraseña</label>
+                <label className="text-[10px] font-black text-sky-500 uppercase tracking-widest ml-1">Gestionar Contraseña</label>
                 <div className="relative">
                   <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-sky-300" size={18} />
-                  <input type="password" value={userToEdit.password || ''} onChange={e => setUserToEdit({...userToEdit, password: e.target.value})} className="w-full bg-sky-50 border border-sky-100 rounded-2xl px-12 py-4 font-bold text-slate-800 outline-none" placeholder="Ingresa nueva clave" />
+                  <input type="password" value={userToEdit.password || ''} onChange={e => setUserToEdit({...userToEdit, password: e.target.value})} className="w-full bg-sky-50 border border-sky-100 rounded-2xl px-12 py-4 font-bold text-slate-800 outline-none placeholder:text-sky-200" placeholder="Actualizar clave" />
                 </div>
               </div>
-              <button type="submit" className="w-full py-5 bg-slate-900 text-white rounded-[1.8rem] font-black uppercase text-[10px] mt-4 shadow-xl">Guardar Cambios</button>
+              <button type="submit" className="w-full py-5 bg-slate-900 text-white rounded-[1.8rem] font-black uppercase text-[10px] mt-4 shadow-xl shadow-slate-200 active:scale-95 transition-all">Guardar Cambios</button>
             </form>
           </div>
         </div>
       )}
 
-      {/* MODAL CREAR ADMIN */}
       {showAdminModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-6">
           <div className="bg-white w-full max-w-lg rounded-[4rem] p-12 shadow-2xl animate-in zoom-in-95">
             <div className="flex justify-between items-center mb-10">
-              <h3 className="text-3xl font-black text-slate-900">Registrar Admin</h3>
-              <button onClick={() => setShowAdminModal(false)}><X size={28}/></button>
+              <h3 className="text-3xl font-black text-slate-900 tracking-tight leading-none">Registrar Miembro</h3>
+              <button onClick={() => setShowAdminModal(false)} className="text-slate-400 hover:text-slate-900"><X size={28}/></button>
             </div>
             <form onSubmit={createAdmin} className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <input required type="text" value={newAdminData.name} onChange={e => setNewAdminData({...newAdminData, name: e.target.value})} className="w-full bg-slate-50 border rounded-[2rem] px-8 py-5 font-bold outline-none" placeholder="Nombre" />
-                <input required type="tel" value={newAdminData.phone} onChange={e => setNewAdminData({...newAdminData, phone: e.target.value})} className="w-full bg-slate-50 border rounded-[2rem] px-8 py-5 font-bold outline-none" placeholder="Teléfono" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input required type="text" value={newAdminData.name} onChange={e => setNewAdminData({...newAdminData, name: e.target.value})} className="w-full bg-slate-50 border rounded-[2rem] px-8 py-5 font-bold outline-none shadow-inner" placeholder="Nombre completo" />
+                <input required type="tel" value={newAdminData.phone} onChange={e => setNewAdminData({...newAdminData, phone: e.target.value})} className="w-full bg-slate-50 border rounded-[2rem] px-8 py-5 font-bold outline-none shadow-inner" placeholder="Teléfono" />
               </div>
-              <input required type="email" value={newAdminData.email} onChange={e => setNewAdminData({...newAdminData, email: e.target.value})} className="w-full bg-slate-50 border rounded-[2rem] px-8 py-5 font-bold outline-none" placeholder="Correo electrónico" />
-              <input required type="password" value={newAdminData.password} onChange={e => setNewAdminData({...newAdminData, password: e.target.value})} className="w-full bg-slate-50 border rounded-[2rem] px-8 py-5 font-bold outline-none" placeholder="Contraseña de acceso" />
-              <button type="submit" className="w-full py-6 bg-slate-900 text-white rounded-[2.5rem] font-black uppercase tracking-widest mt-4 shadow-2xl">Crear Administrador</button>
+              <input required type="email" value={newAdminData.email} onChange={e => setNewAdminData({...newAdminData, email: e.target.value})} className="w-full bg-slate-50 border rounded-[2rem] px-8 py-5 font-bold outline-none shadow-inner" placeholder="Correo electrónico" />
+              <input required type="password" value={newAdminData.password} onChange={e => setNewAdminData({...newAdminData, password: e.target.value})} className="w-full bg-slate-50 border rounded-[2rem] px-8 py-5 font-bold outline-none shadow-inner" placeholder="Contraseña de acceso" />
+              <div className="bg-sky-50 p-6 rounded-3xl flex items-start gap-4 border border-sky-100 mt-4">
+                <ShieldCheck className="text-sky-500 shrink-0" size={24} />
+                <p className="text-[10px] font-bold text-sky-800 leading-relaxed uppercase tracking-widest">
+                  Este usuario tendrá privilegios de administrador completo sobre la gestión de la clínica.
+                </p>
+              </div>
+              <button type="submit" className="w-full py-6 bg-slate-900 text-white rounded-[2.5rem] font-black uppercase tracking-widest mt-4 shadow-2xl active:scale-95 transition-all">Habilitar Administrador</button>
             </form>
           </div>
         </div>
       )}
 
-      {/* MODAL CREAR TURNO LIBRE */}
+      {showAssignModal && appointmentToAssign && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[200] flex items-center justify-center p-6">
+          <div className="bg-white w-full max-w-md rounded-[3.5rem] p-10 shadow-2xl animate-in zoom-in-95">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-2xl font-black text-slate-900">Agendar Paciente</h3>
+              <button onClick={() => setShowAssignModal(false)} className="text-slate-400"><X size={24}/></button>
+            </div>
+            <div className="relative mb-6">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+              <input type="text" placeholder="Buscar por nombre..." value={patientSearch} onChange={e => setPatientSearch(e.target.value)} className="w-full bg-slate-50 border rounded-2xl pl-12 pr-6 py-4 font-bold outline-none" />
+            </div>
+            <div className="max-h-[300px] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+              {allUsers.filter(u => u.role === 'client' && u.name.toLowerCase().includes(patientSearch.toLowerCase())).map(p => (
+                <button key={p.id} onClick={() => {
+                  setAppointments(prev => prev.map(app => app.id === appointmentToAssign.id ? { ...app, status: 'approved', clientId: p.id, clientName: p.name } : app));
+                  addNotification(p.id, "Cita Asignada", `Te han agendado una cita para el ${appointmentToAssign.date} a las ${appointmentToAssign.startTime}.`, 'status_change');
+                  setShowAssignModal(false);
+                }} className="w-full flex items-center gap-4 p-4 hover:bg-sky-50 rounded-2xl transition-all group border border-transparent hover:border-sky-100">
+                  <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center font-black text-slate-400 group-hover:bg-sky-500 group-hover:text-white transition-all shadow-inner">{p.name.charAt(0)}</div>
+                  <div className="text-left"><p className="text-sm font-black text-slate-800">{p.name}</p><p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">{p.email}</p></div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {showSlotModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-6">
           <div className="bg-white w-full max-w-lg rounded-[4rem] p-12 shadow-2xl animate-in zoom-in-95">
             <h3 className="text-3xl font-black text-slate-900 mb-10">Habilitar Turno</h3>
             <form onSubmit={createSlot} className="space-y-8">
-              <input required type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} min={todayStr} className="w-full bg-slate-50 border rounded-[2rem] px-8 py-5 font-black text-lg outline-none" />
+              <input required type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} min={todayStr} className="w-full bg-slate-50 border border-slate-200 rounded-[2rem] px-8 py-5 font-black text-lg outline-none" />
               <div className="grid grid-cols-2 gap-6">
-                <input required type="time" value={slotStart} onChange={e => setSlotStart(e.target.value)} className="w-full bg-slate-50 border rounded-2xl px-6 py-4 font-bold outline-none" />
-                <input required type="time" value={slotEnd} onChange={e => setSlotEnd(e.target.value)} className="w-full bg-slate-50 border rounded-2xl px-6 py-4 font-bold outline-none" />
+                <input required type="time" value={slotStart} onChange={e => setSlotStart(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 font-bold outline-none" />
+                <input required type="time" value={slotEnd} onChange={e => setSlotEnd(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 font-bold outline-none" />
               </div>
-              <button type="submit" className="w-full py-6 bg-slate-900 text-white rounded-[2.5rem] font-black uppercase mt-4 shadow-xl">Habilitar Espacio</button>
-              <button type="button" onClick={() => setShowSlotModal(false)} className="w-full text-slate-400 font-bold uppercase text-[10px]">Cancelar</button>
+              <button type="submit" className="w-full py-6 bg-slate-900 text-white rounded-[2.5rem] font-black uppercase mt-4 shadow-xl active:scale-95 transition-all">Publicar Espacio</button>
+              <button type="button" onClick={() => setShowSlotModal(false)} className="w-full text-slate-400 font-bold uppercase text-[10px] tracking-widest mt-2 hover:text-slate-900 transition-colors">Cancelar</button>
             </form>
           </div>
         </div>

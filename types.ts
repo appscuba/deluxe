@@ -18,7 +18,7 @@ export type UrgencyLevel = 'low' | 'medium' | 'high';
 export type ToothCondition = 'healthy' | 'caries' | 'filling' | 'missing' | 'extraction' | 'implant' | 'endodontics';
 
 export interface ToothState {
-  id: number; // ISO/FDI numbering (e.g., 11-48)
+  id: number;
   condition: ToothCondition;
   notes?: string;
 }
@@ -43,9 +43,9 @@ export interface Appointment {
   clientId?: string;
   clientName?: string;
   treatmentId?: string;
-  date: string; // ISO string YYYY-MM-DD
-  startTime: string; // HH:mm
-  endTime: string; // HH:mm
+  date: string;
+  startTime: string;
+  endTime: string;
   status: AppointmentStatus;
   urgency?: UrgencyLevel;
   reason?: string;
@@ -67,10 +67,18 @@ export interface Notification {
   createdAt: string;
 }
 
+export interface ClinicSettings {
+  name: string;
+  phone: string;
+  address: string;
+  email: string;
+  availability: ClinicAvailability;
+}
+
 export interface ClinicAvailability {
-  days: number[]; // 0-6 (Sun-Sat)
-  startHour: string; // HH:mm
-  endHour: string; // HH:mm
+  days: number[]; // 0-6
+  startHour: string;
+  endHour: string;
   lunchStart?: string;
   lunchEnd?: string;
 }

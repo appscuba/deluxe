@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, Appointment, Treatment, Notification, ClinicAvailability, PatientRecord, ToothState } from '../types';
+import { User, Appointment, Treatment, Notification, ClinicAvailability, PatientRecord, ToothState, ClinicSettings } from '../types';
 import { INITIAL_TREATMENTS, DEFAULT_AVAILABILITY } from '../constants';
 
 interface AppContextType {
@@ -15,8 +15,8 @@ interface AppContextType {
   notifications: Notification[];
   setNotifications: React.Dispatch<React.SetStateAction<Notification[]>>;
   addNotification: (userId: string, title: string, message: string, type: Notification['type']) => void;
-  availability: ClinicAvailability;
-  setAvailability: React.Dispatch<React.SetStateAction<ClinicAvailability>>;
+  clinicSettings: ClinicSettings;
+  setClinicSettings: React.Dispatch<React.SetStateAction<ClinicSettings>>;
   activeTab: string;
   setActiveTab: (tab: string) => void;
   patientRecords: PatientRecord[];
@@ -25,6 +25,14 @@ interface AppContextType {
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
+
+const DEFAULT_SETTINGS: ClinicSettings = {
+  name: 'Deluxe Dental Care',
+  phone: '+54 9 11 0000-0000',
+  address: 'Av. Corrientes 1234, CABA',
+  email: 'contacto@deluxedental.com',
+  availability: DEFAULT_AVAILABILITY
+};
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
@@ -52,9 +60,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? JSON.parse(saved) : [];
   });
 
-  const [availability, setAvailability] = useState<ClinicAvailability>(() => {
-    const saved = localStorage.getItem('dental_availability');
-    return saved ? JSON.parse(saved) : DEFAULT_AVAILABILITY;
+  const [clinicSettings, setClinicSettings] = useState<ClinicSettings>(() => {
+    const saved = localStorage.getItem('dental_clinic_settings');
+    return saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
   });
 
   const [patientRecords, setPatientRecords] = useState<PatientRecord[]>(() => {
@@ -85,8 +93,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [notifications]);
 
   useEffect(() => {
-    localStorage.setItem('dental_availability', JSON.stringify(availability));
-  }, [availability]);
+    localStorage.setItem('dental_clinic_settings', JSON.stringify(clinicSettings));
+  }, [clinicSettings]);
 
   useEffect(() => {
     localStorage.setItem('dental_patient_records', JSON.stringify(patientRecords));
@@ -123,7 +131,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       appointments, setAppointments,
       treatments, setTreatments,
       notifications, setNotifications, addNotification,
-      availability, setAvailability,
+      clinicSettings, setClinicSettings,
       activeTab, setActiveTab,
       patientRecords, setPatientRecords,
       updatePatientOdontogram
