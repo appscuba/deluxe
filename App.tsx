@@ -1,11 +1,11 @@
 
 import React, { useState } from 'react';
-import { AppProvider, useAppContext } from './context/AppContext.tsx';
-import { Layout } from './components/Layout.tsx';
-import { ClientView } from './components/ClientView.tsx';
-import { AdminView } from './components/AdminView.tsx';
+import { AppProvider, useAppContext } from './context/AppContext';
+import { Layout } from './components/Layout';
+import { ClientView } from './components/ClientView';
+import { AdminView } from './components/AdminView';
 import { PlusCircle, User as UserIcon, Lock, Mail, Phone, ArrowRight, AlertCircle } from 'lucide-react';
-import { User } from './types.ts';
+import { User } from './types';
 
 const AuthScreen: React.FC = () => {
   const { setCurrentUser, allUsers, setAllUsers } = useAppContext();
