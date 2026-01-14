@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppProvider, useAppContext } from './context/AppContext';
 import { Layout } from './components/Layout';
 import { ClientView } from './components/ClientView';
@@ -22,16 +22,18 @@ const AuthScreen: React.FC = () => {
     e.preventDefault();
     setError('');
     
-    const DEFAULT_ADMIN_EMAIL = 'appscuba@gmail.com';
-    const DEFAULT_ADMIN_PASS = 'Asd9310*';
+    const ROOT_EMAIL = 'appscuba@gmail.com';
+    const ROOT_PASS = 'Asd9310*';
+
+    const normalizedEmail = formData.email.trim().toLowerCase();
 
     if (authMode === 'login') {
-      // 1. Verificar Super Admin
-      if (formData.email.toLowerCase() === DEFAULT_ADMIN_EMAIL.toLowerCase() && formData.password === DEFAULT_ADMIN_PASS) {
+      // 1. Validar Super Admin
+      if (normalizedEmail === ROOT_EMAIL && formData.password === ROOT_PASS) {
         setCurrentUser({
           id: 'admin_root',
-          name: 'Admin Principal',
-          email: DEFAULT_ADMIN_EMAIL,
+          name: 'Super Admin',
+          email: ROOT_EMAIL,
           phone: '000000000',
           role: 'admin',
           createdAt: new Date().toISOString()
@@ -39,43 +41,37 @@ const AuthScreen: React.FC = () => {
         return;
       }
 
-      // 2. Verificar Usuarios en la DB local (Admins secundarios o Clientes)
-      const existingUser = allUsers.find(u => 
-        u.email.toLowerCase() === formData.email.toLowerCase() && 
+      // 2. Validar contra la Base de Datos Local (allUsers)
+      // Buscamos directamente en el estado que ya está sincronizado con localStorage
+      const userFound = allUsers.find(u => 
+        u.email.toLowerCase() === normalizedEmail && 
         u.password === formData.password
       );
-      
-      if (existingUser) {
-        setCurrentUser(existingUser);
+
+      if (userFound) {
+        setCurrentUser(userFound);
         return;
       }
 
-      setError('Credenciales inválidas. Verifica tu correo y contraseña.');
+      setError('Credenciales incorrectas. Si te acabas de registrar, verifica tus datos.');
     } else {
-      // Lógica de Registro
-      const emailExists = allUsers.some(u => u.email.toLowerCase() === formData.email.toLowerCase()) || 
-                          formData.email.toLowerCase() === DEFAULT_ADMIN_EMAIL.toLowerCase();
-      
-      if (emailExists) {
-        setError('Este correo electrónico ya está registrado.');
-        return;
-      }
-
-      if (!formData.phone || formData.phone.length < 7) {
-        setError('Número de teléfono inválido.');
+      // REGISTRO
+      if (allUsers.some(u => u.email.toLowerCase() === normalizedEmail) || normalizedEmail === ROOT_EMAIL) {
+        setError('Este correo ya está en uso.');
         return;
       }
 
       const newUser: User = {
         id: Math.random().toString(36).substr(2, 9),
         name: formData.name,
-        email: formData.email,
+        email: normalizedEmail,
         phone: formData.phone,
         password: formData.password,
         role: 'client',
         createdAt: new Date().toISOString()
       };
       
+      // Actualizamos estado (el useEffect en AppContext se encarga de guardar en localStorage)
       setAllUsers(prev => [...prev, newUser]);
       setCurrentUser(newUser);
     }
@@ -89,110 +85,67 @@ const AuthScreen: React.FC = () => {
             <PlusCircle size={40} />
           </div>
           <div>
-            <h1 className="text-4xl font-black text-slate-900 tracking-tighter">Deluxe Dental</h1>
-            <p className="text-slate-400 text-xs font-black uppercase tracking-[0.3em] mt-2">Professional Care</p>
+            <h1 className="text-4xl font-black text-slate-900 tracking-tighter italic">Deluxe Dental</h1>
+            <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.4em] mt-2">Sistema de Gestión Pro</p>
           </div>
         </div>
 
         <div className="bg-white p-10 rounded-[3.5rem] border border-slate-100 shadow-2xl shadow-slate-200/50">
-          <div className="flex bg-slate-100/50 p-1.5 rounded-2xl mb-8 border border-slate-200/50 overflow-hidden">
+          <div className="flex bg-slate-100/50 p-1.5 rounded-2xl mb-8 border border-slate-200/50">
             <button 
               onClick={() => { setAuthMode('login'); setError(''); }}
               className={`flex-1 py-3.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${authMode === 'login' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'}`}
             >
-              Acceso
+              Entrar
             </button>
             <button 
               onClick={() => { setAuthMode('register'); setError(''); }}
               className={`flex-1 py-3.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${authMode === 'register' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'}`}
             >
-              Registro
+              Nuevo Paciente
             </button>
           </div>
 
           {error && (
-            <div className="mb-6 p-4 bg-red-50 text-red-600 rounded-2xl text-[11px] font-bold flex items-center gap-3 animate-in slide-in-from-top-2">
-              <AlertCircle size={16} />
+            <div className="mb-6 p-4 bg-rose-50 text-rose-600 rounded-2xl text-[11px] font-bold flex items-center gap-3 animate-in slide-in-from-top-2">
+              <AlertCircle size={16} className="shrink-0" />
               {error}
             </div>
           )}
 
-          <form onSubmit={handleAuth} className="space-y-5">
+          <form onSubmit={handleAuth} className="space-y-4">
             {authMode === 'register' && (
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nombre Completo</label>
-                <div className="relative">
-                  <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                  <input 
-                    required
-                    type="text" 
-                    value={formData.name}
-                    onChange={(e) => setFormData({...formData, name: e.target.value})}
-                    placeholder="Ej: Juan Pérez"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-12 py-4 focus:outline-none focus:ring-4 focus:ring-sky-500/10 focus:border-sky-500 transition-all font-bold text-slate-800"
-                  />
-                </div>
+              <div className="relative">
+                <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                <input required type="text" placeholder="Nombre completo" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-12 py-4 font-bold focus:outline-none focus:border-sky-500" />
               </div>
             )}
 
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email</label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                <input 
-                  required
-                  type="email" 
-                  value={formData.email}
-                  onChange={(e) => setFormData({...formData, email: e.target.value})}
-                  placeholder="ejemplo@correo.com"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-12 py-4 focus:outline-none focus:ring-4 focus:ring-sky-500/10 focus:border-sky-500 transition-all font-bold text-slate-800"
-                />
-              </div>
+            <div className="relative">
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+              <input required type="email" placeholder="Correo electrónico" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-12 py-4 font-bold focus:outline-none focus:border-sky-500" />
             </div>
 
             {authMode === 'register' && (
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Teléfono</label>
-                <div className="relative">
-                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                  <input 
-                    required
-                    type="tel" 
-                    value={formData.phone}
-                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                    placeholder="+54 9 11 0000-0000"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-12 py-4 focus:outline-none focus:ring-4 focus:ring-sky-500/10 focus:border-sky-500 transition-all font-bold text-slate-800"
-                  />
-                </div>
+              <div className="relative">
+                <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                <input required type="tel" placeholder="WhatsApp / Teléfono" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-12 py-4 font-bold focus:outline-none focus:border-sky-500" />
               </div>
             )}
 
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Contraseña</label>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                <input 
-                  required
-                  type="password" 
-                  value={formData.password}
-                  onChange={(e) => setFormData({...formData, password: e.target.value})}
-                  placeholder="••••••••"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-12 py-4 focus:outline-none focus:ring-4 focus:ring-sky-500/10 focus:border-sky-500 transition-all font-bold text-slate-800"
-                />
-              </div>
+            <div className="relative">
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+              <input required type="password" placeholder="Contraseña" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-12 py-4 font-bold focus:outline-none focus:border-sky-500" />
             </div>
 
-            <button 
-              type="submit"
-              className="w-full py-5 rounded-[1.8rem] font-black shadow-2xl transition-all flex items-center justify-center gap-3 mt-8 active:scale-95 bg-sky-500 text-white shadow-sky-200 hover:bg-sky-600"
-            >
-              {authMode === 'register' ? 'Registrarme ahora' : 'Iniciar Sesión'}
+            <button type="submit" className="w-full py-5 rounded-[1.8rem] font-black bg-sky-500 text-white shadow-xl shadow-sky-100 hover:bg-sky-600 transition-all flex items-center justify-center gap-3 mt-6">
+              {authMode === 'register' ? 'Crear mi cuenta' : 'Acceder al sistema'}
               <ArrowRight size={20} />
             </button>
           </form>
 
-          <p className="mt-10 text-center text-[10px] text-slate-300 font-bold uppercase tracking-widest">
-            Desarrollado por <a href="mailto:appscuba@gmail.com" className="hover:text-sky-500 transition-colors">PedritoTech</a>
+          <p className="mt-8 text-center text-[9px] text-slate-300 font-black uppercase tracking-widest">
+            Deluxe Dental Care © {new Date().getFullYear()}
           </p>
         </div>
       </div>
@@ -202,12 +155,11 @@ const AuthScreen: React.FC = () => {
 
 const MainApp: React.FC = () => {
   const { currentUser } = useAppContext();
-  if (!currentUser) return <AuthScreen />;
-  return (
+  return currentUser ? (
     <Layout>
       {currentUser.role === 'admin' ? <AdminView /> : <ClientView />}
     </Layout>
-  );
+  ) : <AuthScreen />;
 };
 
 export default function App() {

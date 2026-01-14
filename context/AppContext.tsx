@@ -26,6 +26,16 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+const STORAGE_KEYS = {
+  USER: 'deluxe_current_user',
+  ALL_USERS: 'deluxe_db_users',
+  APPOINTMENTS: 'deluxe_db_appointments',
+  TREATMENTS: 'deluxe_db_treatments',
+  NOTIFICATIONS: 'deluxe_db_notifications',
+  SETTINGS: 'deluxe_db_settings',
+  RECORDS: 'deluxe_db_patient_records'
+};
+
 const DEFAULT_SETTINGS: ClinicSettings = {
   name: 'Deluxe Dental Care',
   phone: '+54 9 11 0000-0000',
@@ -35,54 +45,34 @@ const DEFAULT_SETTINGS: ClinicSettings = {
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const getSaved = (key: string, fallback: any) => {
+  // Función de carga segura
+  const load = (key: string, fallback: any) => {
     try {
-      const saved = localStorage.getItem(key);
-      if (saved === null || saved === 'undefined') return fallback;
-      return JSON.parse(saved);
+      const data = localStorage.getItem(key);
+      return data ? JSON.parse(data) : fallback;
     } catch (e) {
-      console.error(`Error loading key: ${key}`, e);
+      console.error("Error loading " + key, e);
       return fallback;
     }
   };
 
-  const [currentUser, setCurrentUser] = useState<User | null>(() => getSaved('dental_user', null));
-  const [allUsers, setAllUsers] = useState<User[]>(() => getSaved('dental_all_users', []));
-  const [appointments, setAppointments] = useState<Appointment[]>(() => getSaved('dental_appointments', []));
-  const [treatments, setTreatments] = useState<Treatment[]>(() => getSaved('dental_treatments', INITIAL_TREATMENTS));
-  const [notifications, setNotifications] = useState<Notification[]>(() => getSaved('dental_notifications', []));
-  const [clinicSettings, setClinicSettings] = useState<ClinicSettings>(() => getSaved('dental_clinic_settings', DEFAULT_SETTINGS));
-  const [patientRecords, setPatientRecords] = useState<PatientRecord[]>(() => getSaved('dental_patient_records', []));
+  const [currentUser, setCurrentUser] = useState<User | null>(() => load(STORAGE_KEYS.USER, null));
+  const [allUsers, setAllUsers] = useState<User[]>(() => load(STORAGE_KEYS.ALL_USERS, []));
+  const [appointments, setAppointments] = useState<Appointment[]>(() => load(STORAGE_KEYS.APPOINTMENTS, []));
+  const [treatments, setTreatments] = useState<Treatment[]>(() => load(STORAGE_KEYS.TREATMENTS, INITIAL_TREATMENTS));
+  const [notifications, setNotifications] = useState<Notification[]>(() => load(STORAGE_KEYS.NOTIFICATIONS, []));
+  const [clinicSettings, setClinicSettings] = useState<ClinicSettings>(() => load(STORAGE_KEYS.SETTINGS, DEFAULT_SETTINGS));
+  const [patientRecords, setPatientRecords] = useState<PatientRecord[]>(() => load(STORAGE_KEYS.RECORDS, []));
   const [activeTab, setActiveTab] = useState('Dashboard');
 
-  // Sincronización robusta con localStorage
-  useEffect(() => {
-    localStorage.setItem('dental_user', JSON.stringify(currentUser));
-  }, [currentUser]);
-
-  useEffect(() => {
-    localStorage.setItem('dental_all_users', JSON.stringify(allUsers));
-  }, [allUsers]);
-
-  useEffect(() => {
-    localStorage.setItem('dental_appointments', JSON.stringify(appointments));
-  }, [appointments]);
-
-  useEffect(() => {
-    localStorage.setItem('dental_treatments', JSON.stringify(treatments));
-  }, [treatments]);
-
-  useEffect(() => {
-    localStorage.setItem('dental_notifications', JSON.stringify(notifications));
-  }, [notifications]);
-
-  useEffect(() => {
-    localStorage.setItem('dental_clinic_settings', JSON.stringify(clinicSettings));
-  }, [clinicSettings]);
-
-  useEffect(() => {
-    localStorage.setItem('dental_patient_records', JSON.stringify(patientRecords));
-  }, [patientRecords]);
+  // EFECTOS DE PERSISTENCIA INMEDIATA
+  useEffect(() => { localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(currentUser)); }, [currentUser]);
+  useEffect(() => { localStorage.setItem(STORAGE_KEYS.ALL_USERS, JSON.stringify(allUsers)); }, [allUsers]);
+  useEffect(() => { localStorage.setItem(STORAGE_KEYS.APPOINTMENTS, JSON.stringify(appointments)); }, [appointments]);
+  useEffect(() => { localStorage.setItem(STORAGE_KEYS.TREATMENTS, JSON.stringify(treatments)); }, [treatments]);
+  useEffect(() => { localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(notifications)); }, [notifications]);
+  useEffect(() => { localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(clinicSettings)); }, [clinicSettings]);
+  useEffect(() => { localStorage.setItem(STORAGE_KEYS.RECORDS, JSON.stringify(patientRecords)); }, [patientRecords]);
 
   const addNotification = (userId: string, title: string, message: string, type: Notification['type']) => {
     const newNotif: Notification = {
