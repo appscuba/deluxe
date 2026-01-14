@@ -14,6 +14,21 @@ export interface User {
 export type AppointmentStatus = 'available' | 'pending' | 'approved' | 'rejected' | 'rescheduled' | 'completed' | 'cancelled';
 export type UrgencyLevel = 'low' | 'medium' | 'high';
 
+export type ToothCondition = 'healthy' | 'caries' | 'filling' | 'missing' | 'extraction' | 'implant' | 'endodontics';
+
+export interface ToothState {
+  id: number; // ISO/FDI numbering (e.g., 11-48)
+  condition: ToothCondition;
+  notes?: string;
+}
+
+export interface PatientRecord {
+  patientId: string;
+  odontogram: ToothState[];
+  clinicalHistory: string;
+  updatedAt: string;
+}
+
 export interface Treatment {
   id: string;
   name: string;
@@ -24,17 +39,17 @@ export interface Treatment {
 
 export interface Appointment {
   id: string;
-  clientId?: string; // Optional if it's an available slot
+  clientId?: string;
   clientName?: string;
-  treatmentId?: string; // Optional for generic slots
+  treatmentId?: string;
   date: string; // ISO string YYYY-MM-DD
   startTime: string; // HH:mm
   endTime: string; // HH:mm
   status: AppointmentStatus;
   urgency?: UrgencyLevel;
   reason?: string;
-  symptoms?: string[]; // New: Client reported symptoms
-  improvements?: string[]; // New: Client desired improvements
+  symptoms?: string[];
+  improvements?: string[];
   notes?: string;
   createdAt: string;
   isManualBooking?: boolean;

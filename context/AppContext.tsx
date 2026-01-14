@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, Appointment, Treatment, Notification, ClinicAvailability } from '../types';
+import { User, Appointment, Treatment, Notification, ClinicAvailability, PatientRecord, ToothState } from '../types';
 import { INITIAL_TREATMENTS, DEFAULT_AVAILABILITY } from '../constants';
 
 interface AppContextType {
@@ -18,6 +18,8 @@ interface AppContextType {
   setAvailability: React.Dispatch<React.SetStateAction<ClinicAvailability>>;
   activeTab: string;
   setActiveTab: (tab: string) => void;
+  patientRecords: PatientRecord[];
+  updatePatientOdontogram: (patientId: string, odontogram: ToothState[]) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -53,6 +55,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? JSON.parse(saved) : DEFAULT_AVAILABILITY;
   });
 
+  const [patientRecords, setPatientRecords] = useState<PatientRecord[]>(() => {
+    const saved = localStorage.getItem('dental_patient_records');
+    return saved ? JSON.parse(saved) : [];
+  });
+
   const [activeTab, setActiveTab] = useState('Dashboard');
 
   useEffect(() => {
@@ -79,6 +86,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('dental_availability', JSON.stringify(availability));
   }, [availability]);
 
+  useEffect(() => {
+    localStorage.setItem('dental_patient_records', JSON.stringify(patientRecords));
+  }, [patientRecords]);
+
   const addNotification = (userId: string, title: string, message: string, type: Notification['type']) => {
     const newNotif: Notification = {
       id: Math.random().toString(36).substr(2, 9),
@@ -92,6 +103,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setNotifications(prev => [newNotif, ...prev]);
   };
 
+  const updatePatientOdontogram = (patientId: string, odontogram: ToothState[]) => {
+    setPatientRecords(prev => {
+      const existing = prev.find(r => r.patientId === patientId);
+      if (existing) {
+        return prev.map(r => r.patientId === patientId ? { ...r, odontogram, updatedAt: new Date().toISOString() } : r);
+      } else {
+        return [...prev, { patientId, odontogram, clinicalHistory: '', updatedAt: new Date().toISOString() }];
+      }
+    });
+  };
+
   return (
     <AppContext.Provider value={{
       currentUser, setCurrentUser,
@@ -100,7 +122,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       treatments, setTreatments,
       notifications, addNotification,
       availability, setAvailability,
-      activeTab, setActiveTab
+      activeTab, setActiveTab,
+      patientRecords,
+      updatePatientOdontogram
     }}>
       {children}
     </AppContext.Provider>
