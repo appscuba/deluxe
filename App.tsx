@@ -40,14 +40,15 @@ const AuthScreen: React.FC = () => {
       }
 
       // Dynamic User Login (Clients or other Admins)
-      const existingUser = allUsers.find(u => u.email === formData.email);
+      // Validación estricta de Email Y Contraseña
+      const existingUser = allUsers.find(u => u.email === formData.email && u.password === formData.password);
+      
       if (existingUser) {
-        // Nota: En una app real validaríamos el password aquí
         setCurrentUser(existingUser);
         return;
       }
 
-      setError('Usuario no encontrado o credenciales incorrectas.');
+      setError('Email o contraseña incorrectos. Por favor, verifique sus datos.');
     } else {
       // Registration logic
       const emailExists = allUsers.some(u => u.email === formData.email) || formData.email === DEFAULT_ADMIN_EMAIL;
@@ -66,6 +67,7 @@ const AuthScreen: React.FC = () => {
         name: formData.name,
         email: formData.email,
         phone: formData.phone,
+        password: formData.password, // Se guarda la contraseña proporcionada
         role: 'client',
         createdAt: new Date().toISOString()
       };
